@@ -125,7 +125,8 @@ else
 fi
 
 # Initialize DB and set admin credentials if not set
-"$INSTALL_DIR/venv/bin/python3" -c "
+cd "$INSTALL_DIR"
+PYTHONPATH="$INSTALL_DIR" "$INSTALL_DIR/venv/bin/python3" -c "
 from app.database import init_db, get_setting, set_setting
 from app.auth import hash_password
 init_db()
@@ -228,7 +229,7 @@ print('Учетные данные администратора успешно �
     info)
         PORT=$(grep "^PANEL_PORT=" /opt/awg-manager/.env 2>/dev/null | cut -d'=' -f2 || echo "8080")
         IP=$(curl -s --max-time 3 https://api.ipify.org || hostname -I | awk '{print $1}')
-        ADMIN_U=$(/opt/awg-manager/venv/bin/python3 -c "from app.database import get_setting; print(get_setting('admin_username', 'admin'))" 2>/dev/null || echo "admin")
+        ADMIN_U=$(PYTHONPATH=/opt/awg-manager /opt/awg-manager/venv/bin/python3 -c "from app.database import get_setting; print(get_setting('admin_username', 'admin'))" 2>/dev/null || echo "admin")
         echo -e "${CYAN}====================================================${NC}"
         echo -e "${CYAN}   AmneziaWG Multi-Node Web Panel Info              ${NC}"
         echo -e "${CYAN}====================================================${NC}"
