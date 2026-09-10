@@ -23,7 +23,7 @@ AWG_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "awg_panel.db"
 
 HOST = os.getenv("PANEL_HOST", "0.0.0.0")
-PORT = int(os.getenv("PANEL_PORT", "8088"))
+PORT = int(os.getenv("PANEL_PORT", "8090"))
 
 SECRET_KEY = os.getenv("SECRET_KEY", "awg-secret-key-change-in-production")
 

@@ -12,7 +12,7 @@ from app.database import get_setting, get_user_by_username, set_setting
 
 # Default admin credentials if not yet set in DB
 DEFAULT_ADMIN_USER = "admin"
-DEFAULT_ADMIN_PASS = "MGWnbc1yg7"
+DEFAULT_ADMIN_PASS = "password"
 
 
 def hash_password(password: str) -> str:

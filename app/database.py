@@ -115,15 +115,6 @@ def init_db():
         cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('default_mtu', ?)", (str(DEFAULT_MTU),))
         cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('server_host', '')")
 
-        # Ensure at least one default server exists if table is empty
-        server_count = conn.execute("SELECT COUNT(*) FROM servers").fetchone()[0]
-        if server_count == 0:
-            import secrets
-            cur.execute("""
-                INSERT INTO servers (id, name, host, ssh_port, ssh_user, ssh_password, api_port, api_token, status, created_at)
-                VALUES (1, 'Швеция #1 (94.103.2.133)', '94.103.2.133', 98, 'root', 'MGWnbc1yg7', 8089, ?, 'online', datetime('now'))
-            """, (secrets.token_hex(32),))
-
 
 # Settings Helpers
 def get_setting(key: str, default: str = "") -> str:

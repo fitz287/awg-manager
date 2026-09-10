@@ -33,7 +33,7 @@ SYS_CONF="/etc/sysctl.d/99-awg.conf"
 PANEL_PORT="${PANEL_PORT:-8090}"
 PANEL_HOST="${PANEL_HOST:-0.0.0.0}"
 ADMIN_USER="${ADMIN_USER:-admin}"
-ADMIN_PASS="${ADMIN_PASS:-MGWnbc1yg7}"
+ADMIN_PASS="${ADMIN_PASS:-password}"
 
 echo -e "${YELLOW}[1/7] Проверка системы и архитектуры...${NC}"
 ARCH=$(uname -m)
@@ -247,6 +247,25 @@ print('Учетные данные администратора успешно �
         echo -e "Статус:  $(systemctl is-active awg-manager)"
         echo -e "${CYAN}====================================================${NC}"
         ;;
+    uninstall)
+        echo -e "${RED}${BOLD}Внимание! Это действие полностью остановит и удалит AmneziaWG Panel с сервера.${NC}"
+        read -rp "Вы действительно хотите удалить панель и базу данных? (y/N): " confirm
+        if [[ "$confirm" =~ ^[yYдД]$ ]]; then
+            echo -e "${YELLOW}[*] Остановка и отключение службы...${NC}"
+            systemctl stop awg-manager 2>/dev/null || true
+            systemctl disable awg-manager 2>/dev/null || true
+            rm -f /etc/systemd/system/awg-manager.service
+            systemctl daemon-reload
+            echo -e "${YELLOW}[*] Удаление файлов панели из /opt/awg-manager...${NC}"
+            rm -rf /opt/awg-manager
+            echo -e "${YELLOW}[*] Удаление команды awg-manager...${NC}"
+            rm -f /usr/local/bin/awg-manager
+            echo -e "${GREEN}[✓] Панель AmneziaWG успешно удалена с сервера.${NC}"
+            exit 0
+        else
+            echo -e "${GREEN}[i] Удаление отменено.${NC}"
+        fi
+        ;;
     *)
         echo -e "${CYAN}Управление AmneziaWG Web Panel:${NC}"
         echo -e "  awg-manager status          - Проверить статус службы"
@@ -255,6 +274,7 @@ print('Учетные данные администратора успешно �
         echo -e "  awg-manager reset-password  - Сбросить логин/пароль администратора"
         echo -e "  awg-manager set-port <порт> - Изменить веб-порт панели"
         echo -e "  awg-manager info            - Показать информацию о подключении"
+        echo -e "  awg-manager uninstall       - Полное удаление панели с сервера"
         echo -e "  awg-manager stop / start    - Остановка / Запуск"
         ;;
 esac

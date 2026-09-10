@@ -112,7 +112,7 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
     # Public routes
     if (
-        path in ("/login", "/api/auth/login", "/install.sh")
+        path in ("/login", "/api/auth/login", "/install.sh", "/uninstall.sh")
         or path.startswith("/static")
         or path.startswith("/favicon.ico")
     ):
@@ -247,6 +247,16 @@ async def serve_install_script():
     if not install_path.exists():
         raise HTTPException(status_code=404, detail="Install script not found")
     with open(install_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    return PlainTextResponse(content=content, media_type="text/plain; charset=utf-8")
+
+
+@app.get("/uninstall.sh", response_class=PlainTextResponse)
+async def serve_uninstall_script():
+    uninstall_path = BASE_DIR / "scripts" / "uninstall.sh"
+    if not uninstall_path.exists():
+        raise HTTPException(status_code=404, detail="Uninstall script not found")
+    with open(uninstall_path, "r", encoding="utf-8") as f:
         content = f.read()
     return PlainTextResponse(content=content, media_type="text/plain; charset=utf-8")
 

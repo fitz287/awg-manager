@@ -62,7 +62,32 @@ curl -sSL https://awg.fitz.su/install.sh | bash
 5. Инициализирует базу данных SQLite и создаст конфигурацию `.env`.
 6. Настроит и запустит системную службу `systemd` (`awg-manager.service`).
 7. Установит консольную утилиту `awg-manager` для управления из терминала.
-8. Выведет ссылку для входа в панель и данные администратора.
+8. Выведет ссылку для входа в панель (`http://<IP_СЕРВЕРА>:8090`) и данные администратора (логин: `admin`, пароль: `password`).
+
+---
+
+## 🛠 Управление панелью через консоль
+
+После установки на сервере доступна удобная CLI-утилита `awg-manager`:
+```bash
+awg-manager status          # Проверить статус службы
+awg-manager restart         # Перезапустить панель
+awg-manager logs            # Просмотр логов в реальном времени
+awg-manager reset-password  # Сменить логин/пароль администратора
+awg-manager set-port 8090   # Изменить порт панели
+awg-manager info            # Показать адрес панели и статус
+awg-manager uninstall       # Полное удаление панели с сервера
+```
+
+### 🗑 Удаление панели
+Удалить панель можно в любой момент командой:
+```bash
+awg-manager uninstall
+```
+Либо одной командой через curl:
+```bash
+curl -sSL https://raw.githubusercontent.com/fitz287/awg-manager/main/scripts/uninstall.sh | bash
+```
 
 ---
 
