@@ -202,7 +202,7 @@ case "$1" in
             echo -e "${RED}[!] Пароль не может быть пустым.${NC}"
             exit 1
         fi
-        /opt/awg-manager/venv/bin/python3 -c "
+        PYTHONPATH=/opt/awg-manager /opt/awg-manager/venv/bin/python3 -c "
 import sqlite3, bcrypt
 h = bcrypt.hashpw('$new_pass'.encode(), bcrypt.gensalt()).decode()
 conn = sqlite3.connect('/opt/awg-manager/data/awg_panel.db')
