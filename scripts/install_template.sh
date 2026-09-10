@@ -27,6 +27,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 INSTALL_DIR="/opt/awg-manager"
+export PYTHONPATH="$INSTALL_DIR"
 CONFIG_DIR="/etc/amnezia/amneziawg"
 SYS_CONF="/etc/sysctl.d/99-awg.conf"
 PANEL_PORT="${PANEL_PORT:-8080}"
@@ -126,7 +127,10 @@ fi
 
 # Initialize DB and set admin credentials if not set
 cd "$INSTALL_DIR"
-PYTHONPATH="$INSTALL_DIR" "$INSTALL_DIR/venv/bin/python3" -c "
+export PYTHONPATH="$INSTALL_DIR"
+"$INSTALL_DIR/venv/bin/python3" -c "
+import sys
+sys.path.insert(0, '$INSTALL_DIR')
 from app.database import init_db, get_setting, set_setting
 from app.auth import hash_password
 init_db()
