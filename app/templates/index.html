@@ -1,0 +1,2520 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>AmneziaWG Web Panel</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            dark: {
+              850: '#141b2d',
+              900: '#0f172a',
+              950: '#080d1a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    /* Admin navigation: strictly visible ONLY for admin role */
+    body:not(.is-admin) #admin-desktop-nav,
+    body:not(.is-admin) #admin-mobile-nav {
+      display: none !important;
+    }
+  </style>
+</head>
+<body class="bg-dark-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-indigo-500 selection:text-white pb-6">
+
+  <!-- TOP HEADER / NAVBAR -->
+  <header class="bg-dark-900 border-b border-slate-800 sticky top-0 z-40 shadow-xl backdrop-blur bg-opacity-95">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      
+      <!-- Top Row: Logo, Nav, Status, Logout -->
+      <div class="flex items-center justify-between h-14 sm:h-16">
+        <!-- Logo & Title -->
+        <div class="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex-shrink-0 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <i data-lucide="shield" class="w-5 h-5 sm:w-6 sm:h-6 text-white"></i>
+          </div>
+          <div class="min-w-0">
+            <h1 class="font-bold text-base sm:text-lg leading-tight tracking-wide flex items-center gap-1.5 truncate">
+              Amnezia<span class="text-indigo-400">WG</span>
+              <span id="panel-role-badge" class="text-[10px] sm:text-xs font-semibold px-1.5 sm:px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 flex-shrink-0">XRAY</span>
+            </h1>
+            <p id="panel-subtext" class="text-[11px] sm:text-xs text-slate-400 truncate hidden sm:block">Панель управления подключениями и пирами</p>
+          </div>
+        </div>
+
+        <!-- Desktop Navigation Tabs (Admin only, hidden on mobile & for users) -->
+        <nav id="admin-desktop-nav" class="hidden md:flex space-x-1 bg-slate-950/60 p-1.5 rounded-xl border border-slate-800">
+          <button onclick="switchTab('connections')" id="tab-btn-connections" class="tab-btn flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all text-white bg-indigo-600 shadow">
+            <i data-lucide="network" class="w-4 h-4"></i>
+            <span>Подключения AWG</span>
+            <span id="badge-conns-count" class="ml-1 px-1.5 py-0.2 text-xs rounded-full bg-indigo-800 text-indigo-200 font-mono">0</span>
+          </button>
+          <button onclick="switchTab('users')" id="tab-btn-users" class="tab-btn flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800/50">
+            <i data-lucide="users" class="w-4 h-4"></i>
+            <span>Пользователи и Конфиги</span>
+            <span id="badge-users-count" class="ml-1 px-1.5 py-0.2 text-xs rounded-full bg-slate-800 text-slate-300 font-mono">0</span>
+          </button>
+          <button onclick="switchTab('servers')" id="tab-btn-servers" class="tab-btn flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800/50">
+            <i data-lucide="server" class="w-4 h-4"></i>
+            <span>Серверы (Ноды)</span>
+            <span id="badge-servers-count" class="ml-1 px-1.5 py-0.2 text-xs rounded-full bg-slate-800 text-slate-300 font-mono">0</span>
+          </button>
+          <button onclick="switchTab('settings')" id="tab-btn-settings" class="tab-btn flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800/50">
+            <i data-lucide="sliders" class="w-4 h-4"></i>
+            <span>Настройки и Сервер</span>
+          </button>
+        </nav>
+
+        <!-- Right Side: User info & Logout -->
+        <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          <div id="user-info-pill" class="text-xs px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-slate-300 flex items-center gap-1.5">
+            <i data-lucide="user" class="w-3.5 h-3.5 text-indigo-400"></i>
+            <span id="header-username" class="font-medium truncate max-w-[100px] sm:max-w-[160px]">Загрузка...</span>
+          </div>
+
+          <button onclick="handleLogout()" title="Выйти из системы" class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 border border-slate-700/60 text-xs font-medium flex items-center gap-1.5 transition">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">Выйти</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile Navigation Tabs (Admin only, segmented bar on mobile) -->
+      <nav id="admin-mobile-nav" class="grid md:hidden grid-cols-4 gap-1 bg-slate-950/90 p-1 rounded-xl border border-slate-800 mb-2.5 shadow-inner">
+        <button onclick="switchTab('connections')" id="tab-btn-connections-m" class="tab-btn-m flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-lg transition-all text-white bg-indigo-600 shadow text-center">
+          <div class="flex items-center gap-1">
+            <i data-lucide="network" class="w-3.5 h-3.5"></i>
+            <span id="badge-conns-count-m" class="px-1.5 py-0.2 text-[10px] rounded-full bg-indigo-800 text-indigo-200 font-mono">0</span>
+          </div>
+          <span class="text-[11px] font-medium truncate">Туннели</span>
+        </button>
+        <button onclick="switchTab('users')" id="tab-btn-users-m" class="tab-btn-m flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-lg transition-all text-slate-400 hover:text-slate-200 text-center">
+          <div class="flex items-center gap-1">
+            <i data-lucide="users" class="w-3.5 h-3.5"></i>
+            <span id="badge-users-count-m" class="px-1.5 py-0.2 text-[10px] rounded-full bg-slate-800 text-slate-300 font-mono">0</span>
+          </div>
+          <span class="text-[11px] font-medium truncate">Клиенты</span>
+        </button>
+        <button onclick="switchTab('servers')" id="tab-btn-servers-m" class="tab-btn-m flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-lg transition-all text-slate-400 hover:text-slate-200 text-center">
+          <div class="flex items-center gap-1">
+            <i data-lucide="server" class="w-3.5 h-3.5"></i>
+            <span id="badge-servers-count-m" class="px-1.5 py-0.2 text-[10px] rounded-full bg-slate-800 text-slate-300 font-mono">0</span>
+          </div>
+          <span class="text-[11px] font-medium truncate">Серверы</span>
+        </button>
+        <button onclick="switchTab('settings')" id="tab-btn-settings-m" class="tab-btn-m flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-lg transition-all text-slate-400 hover:text-slate-200 text-center">
+          <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+          <span class="text-[11px] font-medium truncate">Настройки</span>
+        </button>
+      </nav>
+
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+
+    <!-- ============================================================== -->
+    <!-- VIEW A: ADMIN DASHBOARD                                        -->
+    <!-- ============================================================== -->
+    <div id="admin-view" class="space-y-6 hidden">
+      
+      <!-- TAB 1: AWG CONNECTIONS -->
+      <div id="tab-connections" class="tab-content space-y-4 sm:space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 bg-slate-900/40 p-4 sm:p-5 rounded-2xl border border-slate-800/80">
+          <div>
+            <h2 class="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+              <i data-lucide="server" class="w-5 h-5 text-indigo-400"></i>
+              Серверные подключения AmneziaWG
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1">
+              Каждое подключение имеет свою подсеть <code class="text-indigo-300 font-mono">10.x.0.0</code>, уникальную таблицу маршрутизации для передачи в Xray и конфиг в <code class="text-slate-300 font-mono">/etc/amnezia/amneziawg/</code>.
+            </p>
+          </div>
+          <button onclick="openCreateConnectionModal()" class="w-full sm:w-auto justify-center inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/25 transition-all">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            Создать подключение
+          </button>
+        </div>
+
+        <div id="connections-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"></div>
+        <div id="connections-empty" class="hidden text-center py-12 sm:py-16 bg-slate-900/30 rounded-2xl border border-dashed border-slate-800">
+          <i data-lucide="shield-off" class="w-12 h-12 text-slate-600 mx-auto mb-3"></i>
+          <p class="text-slate-300 font-medium">Нет созданных подключений AWG</p>
+          <p class="text-xs text-slate-500 mt-1">Нажмите кнопку «Создать подключение», чтобы поднять первый интерфейс.</p>
+        </div>
+      </div>
+
+      <!-- TAB 2: USERS & CLIENTS -->
+      <div id="tab-users" class="tab-content hidden space-y-4 sm:space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 bg-slate-900/40 p-4 sm:p-5 rounded-2xl border border-slate-800/80">
+          <div>
+            <h2 class="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+              <i data-lucide="users" class="w-5 h-5 text-indigo-400"></i>
+              Управление пользователями и клиентами
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1">
+              Каждому пользователю выделяется отдельная подсеть <code class="text-indigo-300 font-mono">10.x.y.0/24</code>. Внутри неё создаются устройства с IP <code class="text-slate-300 font-mono">10.x.y.1</code>, <code class="text-slate-300 font-mono">10.x.y.2</code> и т.д.
+            </p>
+          </div>
+          <button onclick="openCreateUserModal()" class="w-full sm:w-auto justify-center inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/25 transition-all">
+            <i data-lucide="user-plus" class="w-4 h-4"></i>
+            Добавить пользователя
+          </button>
+        </div>
+
+        <div id="users-list" class="space-y-4 sm:space-y-5"></div>
+        <div id="users-empty" class="hidden text-center py-16 bg-slate-900/30 rounded-2xl border border-dashed border-slate-800">
+          <i data-lucide="users" class="w-12 h-12 text-slate-600 mx-auto mb-3"></i>
+          <p class="text-slate-300 font-medium">Пользователи пока не добавлены</p>
+          <p class="text-xs text-slate-500 mt-1">Создайте хотя бы одно подключение AWG, а затем добавьте пользователя.</p>
+        </div>
+      </div>
+      <!-- TAB 3: SERVERS & NODES -->
+      <div id="tab-servers" class="tab-content hidden space-y-4 sm:space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 bg-slate-900/40 p-4 sm:p-5 rounded-2xl border border-slate-800/80">
+          <div>
+            <h2 class="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+              <i data-lucide="server" class="w-5 h-5 text-indigo-400"></i>
+              Управление серверами и нодами (Worker Nodes)
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1">
+              Подключайте любые VPS по SSH в 1 клик. Панель сама установит AmneziaWG, настроит ядро и запустит ноду.
+            </p>
+          </div>
+          <button onclick="openAddServerModal()" class="w-full sm:w-auto justify-center inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/25 transition-all">
+            <i data-lucide="hard-drive-download" class="w-4 h-4"></i>
+            Добавить сервер
+          </button>
+        </div>
+
+        <div id="servers-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"></div>
+        <div id="servers-empty" class="hidden text-center py-12 sm:py-16 bg-slate-900/30 rounded-2xl border border-dashed border-slate-800">
+          <i data-lucide="server-off" class="w-12 h-12 text-slate-600 mx-auto mb-3"></i>
+          <p class="text-slate-300 font-medium">Серверы не добавлены</p>
+          <p class="text-xs text-slate-500 mt-1">Нажмите «Добавить сервер» для подключения первого VPS.</p>
+        </div>
+      </div>
+
+      <!-- TAB 3: SETTINGS -->
+      <div id="tab-settings" class="tab-content hidden space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 bg-slate-900/40 p-5 sm:p-6 rounded-2xl border border-slate-800/80 space-y-5">
+            <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+              <i data-lucide="settings" class="w-5 h-5 text-indigo-400"></i>
+              Основные параметры панели и клиентов
+            </h2>
+
+            <form id="settings-form" onsubmit="saveSettings(event)" class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  Внешний IP / Домен сервера (Endpoint для клиентов)
+                </label>
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <input type="text" id="setting-server-host" required placeholder="например, 194.87.12.34 или vpn.domain.com"
+                    class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono" />
+                  <button type="button" onclick="autoDetectIp()" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-xl border border-slate-700 text-slate-200 flex items-center justify-center gap-1.5 shrink-0 transition">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                    Определить IP
+                  </button>
+                </div>
+                <p class="text-xs text-slate-500 mt-1">Этот адрес подставляется в сгенерированные клиентские файлы конфигурации и QR-коды.</p>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                    DNS серверы по умолчанию
+                  </label>
+                  <input type="text" id="setting-default-dns" value="1.1.1.1, 8.8.8.8" required
+                    class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono" />
+                  <p class="text-xs text-slate-500 mt-1">Разделяются запятой (например, 1.1.1.1, 8.8.8.8)</p>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                    MTU клиентов
+                  </label>
+                  <input type="number" id="setting-default-mtu" value="1200" min="1200" max="1500" required
+                    class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono" />
+                  <p class="text-xs text-slate-500 mt-1">Рекомендуется 1200 (для сотовых сетей LTE/5G и надежного прохождения обфускации)</p>
+                </div>
+              </div>
+
+              <div class="pt-2">
+                <button type="submit" class="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium text-sm rounded-xl transition flex items-center justify-center gap-2">
+                  <i data-lucide="save" class="w-4 h-4"></i>
+                  Сохранить настройки
+                </button>
+              </div>
+            </form>
+
+            <!-- Admin Password Section -->
+            <div class="pt-6 border-t border-slate-800 space-y-4">
+              <h3 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="lock" class="w-4 h-4 text-indigo-400"></i>
+                Безопасность и пароль администратора
+              </h3>
+              <form id="password-form" onsubmit="handleChangePassword(event)" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                  <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Новый логин (опционально)</label>
+                    <input type="text" id="admin-new-user" placeholder="admin"
+                      class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Текущий пароль</label>
+                    <input type="password" id="admin-old-pass" required placeholder="••••••••"
+                      class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Новый пароль</label>
+                    <input type="password" id="admin-new-pass" required placeholder="••••••••" minlength="6"
+                      class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                </div>
+                <div>
+                  <button type="submit" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-indigo-600 active:bg-indigo-700 text-slate-200 hover:text-white text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">
+                    <i data-lucide="key" class="w-3.5 h-3.5"></i>
+                    Обновить учетные данные
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- System Info -->
+          <div class="bg-slate-900/40 p-5 sm:p-6 rounded-2xl border border-slate-800/80 space-y-4">
+            <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+              <i data-lucide="cpu" class="w-5 h-5 text-indigo-400"></i>
+              Состояние системы
+            </h2>
+
+            <div class="space-y-3 text-xs sm:text-sm">
+              <div class="flex justify-between py-1.5 border-b border-slate-800/60">
+                <span class="text-slate-400">ОС:</span>
+                <span id="sys-os" class="font-medium text-slate-200">—</span>
+              </div>
+              <div class="flex justify-between py-1.5 border-b border-slate-800/60">
+                <span class="text-slate-400">Python:</span>
+                <span id="sys-python" class="font-medium text-slate-200">—</span>
+              </div>
+              <div class="flex justify-between py-1.5 border-b border-slate-800/60">
+                <span class="text-slate-400">Свободно на диске:</span>
+                <span id="sys-disk" class="font-medium text-slate-200">—</span>
+              </div>
+              <div class="flex justify-between py-1.5 border-b border-slate-800/60">
+                <span class="text-slate-400 shrink-0">Каталог AWG:</span>
+                <span class="font-mono text-[11px] text-indigo-300 truncate">/etc/amnezia/amneziawg</span>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-400 space-y-2">
+              <div class="font-semibold text-slate-300 flex items-center gap-1.5">
+                <i data-lucide="info" class="w-4 h-4 text-indigo-400"></i>
+                Справка по AmneziaWG на Linux
+              </div>
+              <p>
+                Для реального запуска туннелей на VPS установлен модуль ядра AmneziaWG (<code class="text-indigo-300">amneziawg-dkms</code> и <code class="text-indigo-300">amneziawg-tools</code>).
+              </p>
+              <p>
+                Все сгенерированные конфиги сразу регистрируются для сервисов <code class="text-indigo-300">awg-quick@*.service</code>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- VIEW B: CLIENT PORTAL (FOR REGULAR USERS)                      -->
+    <!-- ============================================================== -->
+    <div id="client-portal-view" class="space-y-5 sm:space-y-6 hidden">
+      
+      <!-- Welcome Hero Card -->
+      <div class="bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-indigo-950/40 p-5 sm:p-6 rounded-3xl border border-slate-800/90 shadow-2xl relative overflow-hidden">
+        <div class="absolute -right-16 -top-16 w-48 h-48 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+          <div class="flex items-start sm:items-center gap-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-600/30 shrink-0">
+              <i data-lucide="shield-check" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                  Личный кабинет: <span id="client-name" class="text-indigo-400">...</span>
+                </h2>
+                <span id="client-subnet-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-mono font-medium">10.x.y.0/24</span>
+              </div>
+              <p class="text-xs sm:text-sm text-slate-400 mt-1 flex flex-wrap items-center gap-2">
+                <span>Подключение: <strong id="client-conn-name" class="text-slate-200">...</strong></span>
+                <span>•</span>
+                <span>Сервер: <code id="client-server-host" class="text-indigo-300 font-mono">...</code></span>
+              </p>
+            </div>
+          </div>
+
+          <!-- Client Actions -->
+          <div class="flex items-center gap-2 pt-1 sm:pt-0">
+            <button onclick="openMyCreateDeviceModal()" class="flex-1 sm:flex-initial justify-center inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/25 transition active:scale-95">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>Добавить устройство</span>
+            </button>
+            <button onclick="openMyChangePasswordModal()" title="Сменить пароль" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-300 hover:text-white text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center gap-1.5 active:scale-95">
+              <i data-lucide="key" class="w-3.5 h-3.5"></i>
+              <span class="hidden sm:inline">Пароль</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Client Devices Section -->
+      <div class="bg-slate-900/40 p-4 sm:p-6 rounded-2xl border border-slate-800/80 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="smartphone" class="w-5 h-5 text-indigo-400"></i>
+            <h3 class="font-bold text-white text-base sm:text-lg">Мои устройства и конфигурации</h3>
+          </div>
+          <span id="client-device-counter" class="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 font-mono">0 устройств</span>
+        </div>
+
+        <!-- Devices Container -->
+        <div id="client-devices-container">
+          <!-- Populated via JS -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="client-devices-empty" class="hidden text-center py-12 bg-slate-950/40 rounded-2xl border border-dashed border-slate-800 space-y-3">
+          <i data-lucide="smartphone" class="w-12 h-12 text-slate-600 mx-auto"></i>
+          <div>
+            <p class="text-slate-300 font-medium">У вас пока нет добавленных устройств</p>
+            <p class="text-xs text-slate-500 mt-0.5">Создайте профиль для смартфона, ноутбука или роутера, чтобы подключиться к VPN.</p>
+          </div>
+          <button onclick="openMyCreateDeviceModal()" class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            Добавить первое устройство
+          </button>
+        </div>
+      </div>
+
+      <!-- Help Card for Client -->
+      <div class="bg-slate-900/30 p-4 sm:p-5 rounded-2xl border border-slate-800/60 text-xs text-slate-400 space-y-2">
+        <div class="font-semibold text-slate-300 flex items-center gap-1.5">
+          <i data-lucide="info" class="w-4 h-4 text-indigo-400"></i>
+          Инструкция по подключению
+        </div>
+        <p>
+          1. Установите официальное приложение <strong>AmneziaVPN</strong> или <strong>AmneziaWG</strong> на телефон или компьютер.
+        </p>
+        <p>
+          2. Для смартфона нажмите кнопку <strong>QR</strong> у нужного устройства и отсканируйте код камерой в приложении.
+        </p>
+        <p>
+          3. Для ПК или роутера скачайте файл <strong>.conf</strong> и импортируйте его в программу.
+        </p>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- MODALS (ADMIN & CLIENT)                                        -->
+  <!-- ============================================================== -->
+
+  <!-- MODAL: CREATE CONNECTION (Admin) -->
+  <div id="modal-create-conn" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[92vh] flex flex-col">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+          </div>
+          <h3 class="font-bold text-white text-base">Создание подключения AmneziaWG</h3>
+        </div>
+        <button onclick="closeModal('modal-create-conn')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-create-conn" onsubmit="submitCreateConnection(event)" class="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Сервер / Нода (Целевой VPS)</label>
+          <select id="conn-server-id" required
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none">
+          </select>
+          <p class="text-[11px] text-slate-500 mt-1">Сервер, на котором будет развернут интерфейс AmneziaWG</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Имя интерфейса</label>
+            <input type="text" id="conn-name" required placeholder="awg1"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none" />
+            <p class="text-[11px] text-slate-500 mt-1">Каталог: /etc/amnezia/amneziawg/{имя}/</p>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Порт прослушивания UDP</label>
+            <input type="number" id="conn-port" required min="1" max="65535" value="51820"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-2">Протокол AmneziaWG</label>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+            <label class="cursor-pointer border border-slate-800 rounded-xl p-3 bg-slate-950/60 hover:border-indigo-500/50 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-600/10 transition flex flex-row sm:flex-col items-center justify-between sm:justify-center text-left sm:text-center gap-2">
+              <input type="radio" name="protocol_version" value="1.0" class="sr-only" onchange="onProtocolChange('1.0')" checked />
+              <div>
+                <span class="font-bold text-sm text-indigo-400 block">AWG 1.0</span>
+                <span class="text-[11px] text-slate-400">Jc, Jmin/max, S1, S2, H1-H4</span>
+              </div>
+              <span class="sm:hidden text-xs text-indigo-400 font-semibold px-2 py-0.5 rounded bg-indigo-500/10">Выбрать</span>
+            </label>
+
+            <label class="cursor-pointer border border-slate-800 rounded-xl p-3 bg-slate-950/60 hover:border-indigo-500/50 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-600/10 transition flex flex-row sm:flex-col items-center justify-between sm:justify-center text-left sm:text-center gap-2">
+              <input type="radio" name="protocol_version" value="2.0" class="sr-only" onchange="onProtocolChange('2.0')" />
+              <div>
+                <span class="font-bold text-sm text-indigo-400 block">AWG 2.0</span>
+                <span class="text-[11px] text-slate-400">+ S3, S4, расширенные заголовки</span>
+              </div>
+              <span class="sm:hidden text-xs text-indigo-400 font-semibold px-2 py-0.5 rounded bg-indigo-500/10">Выбрать</span>
+            </label>
+
+            <label class="cursor-pointer border border-slate-800 rounded-xl p-3 bg-slate-950/60 hover:border-indigo-500/50 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-600/10 transition flex flex-row sm:flex-col items-center justify-between sm:justify-center text-left sm:text-center gap-2">
+              <input type="radio" name="protocol_version" value="3.1" class="sr-only" onchange="onProtocolChange('3.1')" />
+              <div>
+                <span class="font-bold text-sm text-indigo-400 block">AWG 3.1</span>
+                <span class="text-[11px] text-slate-400">HeaderProtection, Trailers, Padding</span>
+              </div>
+              <span class="sm:hidden text-xs text-indigo-400 font-semibold px-2 py-0.5 rounded bg-indigo-500/10">Выбрать</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Подсеть (X в 10.x.0.0/16)</label>
+            <div class="relative flex items-center">
+              <span class="absolute left-3 text-slate-400 text-sm font-mono">10.</span>
+              <input type="number" id="conn-x-subnet" required min="1" max="254" value="13"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-24 py-2.5 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
+              <span class="absolute right-3 text-slate-400 text-sm font-mono">.0.0/16</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">IP сервера: 10.<span id="preview-x">13</span>.0.1/16</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Порт передачи в XRAY</label>
+            <input type="number" id="conn-xray-port" required min="1" max="65535" value="7010"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono" />
+            <p class="text-[11px] text-slate-500 mt-1">Входящий TProxy инбаунд в Xray</p>
+          </div>
+        </div>
+
+        <div class="p-3.5 sm:p-4 rounded-xl bg-slate-950/70 border border-slate-800/90 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-300 flex items-center gap-1.5">
+              <i data-lucide="route" class="w-3.5 h-3.5 text-indigo-400"></i>
+              Маршрутизация (Авто-инкремент)
+            </span>
+            <span class="text-[11px] text-emerald-400 font-medium">Без конфликтов</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">Номер таблицы</label>
+              <input type="number" id="conn-table" required
+                class="w-full bg-dark-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">Метка fwmark</label>
+              <input type="number" id="conn-fwmark" required
+                class="w-full bg-dark-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
+            </div>
+          </div>
+        </div>
+
+        <div class="border border-slate-800 rounded-xl overflow-hidden">
+          <div class="w-full px-3.5 sm:px-4 py-2.5 bg-slate-950/50 flex items-center justify-between text-xs text-slate-400 gap-2">
+            <button type="button" onclick="toggleParamsPreview()" class="flex items-center gap-1.5 font-medium hover:text-slate-200 truncate">
+              <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 shrink-0"></i>
+              <span class="truncate">Параметры обфускации</span>
+              <i id="preview-arrow" data-lucide="chevron-down" class="w-4 h-4 transition-transform inline-block ml-1 shrink-0"></i>
+            </button>
+            <button type="button" onclick="regenerateParams(event)" class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-400 hover:text-indigo-300 text-[11px] font-medium transition border border-slate-700/50">
+              <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+              <span>Перегенерировать</span>
+            </button>
+          </div>
+          <div id="params-preview-box" class="hidden p-3.5 sm:p-4 bg-slate-950/80 border-t border-slate-800 text-xs font-mono space-y-1 text-slate-300 max-h-48 overflow-y-auto"></div>
+        </div>
+
+        <div class="pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
+          <button type="button" onclick="closeModal('modal-create-conn')" class="w-full sm:w-auto px-4 py-2.5 text-sm text-slate-400 hover:text-slate-200 text-center rounded-xl bg-slate-800/40 sm:bg-transparent">
+            Отмена
+          </button>
+          <button type="submit" class="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-sm rounded-xl shadow transition text-center">
+            Создать подключение
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  
+  <!-- MODAL: ADD SERVER (Admin) -->
+  <div id="modal-add-server" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[92vh] flex flex-col">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center">
+            <i data-lucide="hard-drive-download" class="w-4 h-4"></i>
+          </div>
+          <h3 class="font-bold text-white text-base">Добавить рабочий сервер (Worker Node)</h3>
+        </div>
+        <button onclick="closeModal('modal-add-server')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-add-server" onsubmit="submitAddServer(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Название сервера / Локация</label>
+          <input type="text" id="srv-name" required placeholder="например: Нидерланды #01 или Основной VPS"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none" />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">IP адрес или Домен</label>
+            <input type="text" id="srv-host" required placeholder="например: 194.87.12.34"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">SSH Порт</label>
+            <input type="number" id="srv-ssh-port" required value="22" min="1" max="65535"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">SSH Пользователь</label>
+          <input type="text" id="srv-ssh-user" required value="root"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-2">Способ авторизации SSH</label>
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <button type="button" onclick="setAuthType('password')" id="auth-type-pass" class="py-2 text-xs font-semibold rounded-xl bg-indigo-600 text-white border border-indigo-500 transition">
+              Пароль
+            </button>
+            <button type="button" onclick="setAuthType('key')" id="auth-type-key" class="py-2 text-xs font-semibold rounded-xl bg-slate-950 text-slate-400 border border-slate-800 hover:text-white transition">
+              SSH Приватный ключ
+            </button>
+          </div>
+
+          <div id="auth-field-pass">
+            <input type="password" id="srv-ssh-pass" placeholder="Пароль пользователя root"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none" />
+          </div>
+
+          <div id="auth-field-key" class="hidden">
+            <textarea id="srv-ssh-key" rows="4" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;..."
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white font-mono focus:border-indigo-500 focus:outline-none"></textarea>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs text-slate-400 space-y-1.5">
+          <div class="font-semibold text-slate-300 flex items-center gap-1.5">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-indigo-400"></i>
+            Автоматическое развёртывание
+          </div>
+          <p>Панель подключится по SSH, установит модуль ядра AmneziaWG DKMS, утилиты awg-tools и запустит агент ноды на порту 8089.</p>
+        </div>
+
+        <div class="pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
+          <button type="button" onclick="closeModal('modal-add-server')" class="w-full sm:w-auto px-4 py-2.5 text-sm text-slate-400 hover:text-slate-200 text-center rounded-xl bg-slate-800/40 sm:bg-transparent">
+            Отмена
+          </button>
+          <button type="submit" class="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-sm rounded-xl shadow transition text-center flex items-center justify-center gap-2">
+            <i data-lucide="play" class="w-4 h-4"></i>
+            Установить и запустить ноду
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: SERVER PROVISIONING LOGS (Admin) -->
+  <div id="modal-server-logs" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center shrink-0">
+            <i data-lucide="terminal" class="w-4 h-4"></i>
+          </div>
+          <div class="min-w-0">
+            <h3 class="font-bold text-white text-base truncate">Логи развёртывания ноды</h3>
+            <p id="logs-server-subtitle" class="text-xs text-slate-400 truncate">Подключение к серверу...</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="logs-status-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1.5">
+            <i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Установка...
+          </span>
+          <button onclick="closeServerLogsModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-950 flex-1 overflow-hidden flex flex-col">
+        <pre id="server-logs-terminal" class="flex-1 overflow-y-auto font-mono text-xs text-emerald-400/90 whitespace-pre-wrap leading-relaxed select-text p-2"></pre>
+      </div>
+
+      <div class="px-4 py-3 bg-slate-900/60 border-t border-slate-800 flex justify-end gap-2">
+        <button onclick="closeServerLogsModal()" class="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
+          Закрыть
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE USER (Admin) -->
+  <div id="modal-create-user" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center">
+            <i data-lucide="user-plus" class="w-4 h-4"></i>
+          </div>
+          <h3 class="font-bold text-white text-base">Добавить пользователя</h3>
+        </div>
+        <button onclick="closeModal('modal-create-user')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-create-user" onsubmit="submitCreateUser(event)" class="p-4 sm:p-6 space-y-4">
+        <div class="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/20 text-xs text-indigo-300 flex items-start gap-2.5">
+          <i data-lucide="globe" class="w-4 h-4 text-indigo-400 shrink-0 mt-0.5"></i>
+          <div>
+            <p class="font-medium text-slate-200">Глобальный пользователь</p>
+            <p class="text-slate-400 mt-0.5">Пользователь будет доступен на всех подключениях и серверах. Подключение выбирается при создании каждого устройства (конфига).</p>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Имя пользователя / Логин</label>
+          <input type="text" id="user-username" required placeholder="например, alex, ivan, client1"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none" />
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold uppercase text-slate-400">
+              Пароль для входа (опционально)
+            </label>
+            <button type="button" onclick="generateRandomUserPassword()" class="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium">
+              Сгенерировать
+            </button>
+          </div>
+          <input type="text" id="user-password" placeholder="Оставьте пустым, если вход не нужен"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono" />
+          <p class="text-[11px] text-slate-500 mt-1">Позволит пользователю заходить в панель и управлять своими устройствами.</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Примечание (опционально)</label>
+          <input type="text" id="user-notes" placeholder="например, Друг / Отдел продаж"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none" />
+        </div>
+
+        <div class="pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
+          <button type="button" onclick="closeModal('modal-create-user')" class="w-full sm:w-auto px-4 py-2.5 text-sm text-slate-400 hover:text-slate-200 text-center rounded-xl bg-slate-800/40 sm:bg-transparent">
+            Отмена
+          </button>
+          <button type="submit" class="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-sm rounded-xl shadow transition text-center">
+            Создать
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: RESET USER PASSWORD (Admin) -->
+  <div id="modal-reset-user-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center">
+            <i data-lucide="key" class="w-4 h-4"></i>
+          </div>
+          <h3 id="reset-user-pw-title" class="font-bold text-white text-base">Смена пароля пользователя</h3>
+        </div>
+        <button onclick="closeModal('modal-reset-user-password')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-reset-user-pw" onsubmit="submitResetUserPassword(event)" class="p-4 sm:p-6 space-y-4">
+        <input type="hidden" id="reset-user-pw-id" />
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold uppercase text-slate-400">Новый пароль</label>
+            <button type="button" onclick="generateRandomResetPassword()" class="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium">
+              Сгенерировать
+            </button>
+          </div>
+          <input type="text" id="reset-user-pw-input" required minlength="4" placeholder="Введите новый пароль"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono" />
+        </div>
+
+        <div class="pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
+          <button type="button" onclick="closeModal('modal-reset-user-password')" class="w-full sm:w-auto px-4 py-2.5 text-sm text-slate-400 hover:text-slate-200 text-center rounded-xl bg-slate-800/40 sm:bg-transparent">
+            Отмена
+          </button>
+          <button type="submit" class="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-sm rounded-xl shadow transition text-center">
+            Сохранить пароль
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD PEER (Admin) -->
+  <div id="modal-create-peer" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center">
+            <i data-lucide="smartphone" class="w-4 h-4"></i>
+          </div>
+          <h3 class="font-bold text-white text-base">Добавить устройство</h3>
+        </div>
+        <button onclick="closeModal('modal-create-peer')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-create-peer" onsubmit="submitCreatePeer(event)" class="p-4 sm:p-6 space-y-4">
+        <input type="hidden" id="peer-user-id" />
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Подключение AWG / Сервер</label>
+          <select id="peer-conn-id" required onchange="updateAdminPeerPreview()"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none">
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Ярлык устройства</label>
+          <input type="text" id="peer-label" required placeholder="например, iPhone, Ноутбук, Смарт-ТВ"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none" />
+        </div>
+
+        <div class="p-3 rounded-xl bg-indigo-600/10 border border-indigo-500/20 text-xs text-indigo-300 flex items-center justify-between">
+          <span>Подсеть подключения:</span>
+          <span id="preview-peer-subnet" class="font-mono font-bold text-sm text-indigo-200">10.x.y.0/24</span>
+        </div>
+
+        <div class="flex items-center gap-2 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+          <input type="checkbox" id="peer-use-psk" class="rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer" />
+          <label for="peer-use-psk" class="text-xs text-slate-300 select-none cursor-pointer">
+            Генерировать Pre-Shared Key (доп. симметричный ключ)
+          </label>
+        </div>
+
+        <div class="pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
+          <button type="button" onclick="closeModal('modal-create-peer')" class="w-full sm:w-auto px-4 py-2.5 text-sm text-slate-400 hover:text-slate-200 text-center rounded-xl bg-slate-800/40 sm:bg-transparent">
+            Отмена
+          </button>
+          <button type="submit" class="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-sm rounded-xl shadow transition text-center">
+            Создать конфиг
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD DEVICE (Client Portal) -->
+  <div id="modal-my-create-device" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center">
+            <i data-lucide="smartphone" class="w-4 h-4"></i>
+          </div>
+          <h3 class="font-bold text-white text-base">Новое устройство</h3>
+        </div>
+        <button onclick="closeModal('modal-my-create-device')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-my-create-device" onsubmit="submitMyCreateDevice(event)" class="p-4 sm:p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Локация / Подключение AWG</label>
+          <select id="my-device-conn-id" required onchange="updateClientPeerPreview()"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none">
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Ярлык / Название устройства</label>
+          <input type="text" id="my-device-label" required placeholder="например, Мой iPhone, Ноутбук, Роутер"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none" />
+        </div>
+
+        <div class="p-3 rounded-xl bg-indigo-600/10 border border-indigo-500/20 text-xs text-indigo-300 flex items-center justify-between">
+          <span>Подсеть подключения:</span>
+          <span id="preview-my-peer-subnet" class="font-mono font-bold text-sm text-indigo-200">10.x.y.0/24</span>
+        </div>
+
+        <div class="flex items-center gap-2 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+          <input type="checkbox" id="my-device-use-psk" class="rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer" />
+          <label for="my-device-use-psk" class="text-xs text-slate-300 select-none cursor-pointer">
+            Дополнительный ключ Pre-Shared Key (повышенная защита)
+          </label>
+        </div>
+
+        <div class="pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
+          <button type="button" onclick="closeModal('modal-my-create-device')" class="w-full sm:w-auto px-4 py-2.5 text-sm text-slate-400 hover:text-slate-200 text-center rounded-xl bg-slate-800/40 sm:bg-transparent">
+            Отмена
+          </button>
+          <button type="submit" class="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-sm rounded-xl shadow transition text-center">
+            Создать устройство
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CHANGE OWN PASSWORD (Client Portal) -->
+  <div id="modal-my-change-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center">
+            <i data-lucide="lock" class="w-4 h-4"></i>
+          </div>
+          <h3 class="font-bold text-white text-base">Смена пароля</h3>
+        </div>
+        <button onclick="closeModal('modal-my-change-password')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-my-change-pw" onsubmit="submitMyChangePassword(event)" class="p-4 sm:p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Текущий пароль</label>
+          <input type="password" id="my-pw-old" required placeholder="••••••••"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Новый пароль</label>
+          <input type="password" id="my-pw-new" required minlength="4" placeholder="••••••••"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none" />
+        </div>
+
+        <div class="pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
+          <button type="button" onclick="closeModal('modal-my-change-password')" class="w-full sm:w-auto px-4 py-2.5 text-sm text-slate-400 hover:text-slate-200 text-center rounded-xl bg-slate-800/40 sm:bg-transparent">
+            Отмена
+          </button>
+          <button type="submit" class="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-sm rounded-xl shadow transition text-center">
+            Обновить пароль
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: QR CODE & CONFIG VIEWER (Shared) -->
+  <div id="modal-qr" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[92vh]">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center shrink-0">
+            <i data-lucide="qr-code" class="w-4 h-4"></i>
+          </div>
+          <div class="min-w-0">
+            <h3 id="qr-title" class="font-bold text-white text-base truncate">Конфигурация устройства</h3>
+            <p id="qr-subtitle" class="text-xs text-slate-400 truncate">Для приложения AmneziaVPN / AmneziaWG</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modal-qr')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 shrink-0">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 flex flex-col items-center">
+        <div class="p-3 sm:p-4 bg-white rounded-2xl shadow-xl flex items-center justify-center" id="qrcode-container"></div>
+
+        <div class="w-full flex flex-col sm:flex-row gap-2 sm:gap-3 pt-1">
+          <button id="btn-download-conf" class="flex-1 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition shadow">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>Скачать .conf</span>
+          </button>
+          <button id="btn-copy-conf" onclick="copyModalConfig()" class="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 border border-slate-700 transition">
+            <i data-lucide="copy" class="w-4 h-4"></i>
+            <span>Скопировать текст</span>
+          </button>
+        </div>
+
+        <div class="w-full pt-1">
+          <label class="block text-[11px] font-semibold uppercase text-slate-400 mb-1">Текст конфигурации:</label>
+          <textarea id="qr-config-text" readonly rows="6"
+            class="w-full font-mono text-[11px] sm:text-xs bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-300 focus:outline-none select-all"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SERVER CONFIG VIEWER (Admin) -->
+  <div id="modal-server-conf" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[88vh]">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between">
+        <h3 id="server-conf-title" class="font-bold text-white text-base">Конфигурация сервера</h3>
+        <button onclick="closeModal('modal-server-conf')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-4 sm:p-6 space-y-3 overflow-y-auto flex-1">
+        <p class="text-xs text-slate-400">Файл на сервере: <code id="server-conf-path" class="text-indigo-300 font-mono">/etc/amnezia/amneziawg/...</code></p>
+        <textarea id="server-conf-text" readonly rows="15" class="w-full font-mono text-xs bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 focus:outline-none select-all"></textarea>
+      </div>
+      <div class="p-3.5 sm:p-4 border-t border-slate-800 flex justify-end">
+        <button onclick="closeModal('modal-server-conf')" class="w-full sm:w-auto px-4 py-2 bg-slate-800 text-slate-300 text-sm rounded-xl hover:bg-slate-700">
+          Закрыть
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-box" class="fixed bottom-5 right-3 left-3 sm:left-auto sm:right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- APPLICATION JAVASCRIPT -->
+  <script>
+    // State
+    let currentAuth = null;
+    let connectionsData = [];
+    let usersData = [];
+    let serversData = [];
+    let logPollTimer = null;
+    let currentAuthType = 'password';
+    let clientDevicesData = [];
+    let clientInfoData = null;
+    let nextDefaults = null;
+    let currentProtocol = '1.0';
+    let qrcodeObj = null;
+    let activeModalConfigText = '';
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async () => {
+      lucide.createIcons();
+      await initApplication();
+    });
+
+    async function initApplication() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) {
+          window.location.href = '/login';
+          return;
+        }
+        currentAuth = await res.json();
+        
+        document.getElementById('header-username').innerText = currentAuth.username;
+
+        if (currentAuth.role === 'admin') {
+          // Setup Admin View
+          document.body.classList.add('is-admin');
+          document.body.classList.remove('is-client');
+          document.getElementById('panel-role-badge').innerText = 'ADMIN';
+          document.getElementById('panel-subtext').innerText = 'Панель управления подключениями и пирами';
+
+          document.getElementById('admin-view').classList.remove('hidden');
+          document.getElementById('client-portal-view').classList.add('hidden');
+
+          await loadSettings();
+          await loadServers();
+          await loadConnections();
+          await loadUsers();
+          await loadSystemStatus();
+
+          // Periodic refresh
+          setInterval(() => {
+            loadConnections(false);
+          }, 8000);
+        } else {
+          // Setup Client Portal View
+          document.body.classList.remove('is-admin');
+          document.body.classList.add('is-client');
+          document.getElementById('panel-role-badge').innerText = 'КЛИЕНТ';
+          document.getElementById('panel-subtext').innerText = 'Личный кабинет пользователя';
+
+          document.getElementById('admin-view').classList.add('hidden');
+          document.getElementById('client-portal-view').classList.remove('hidden');
+
+          await loadClientPortal();
+        }
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Init error:', err);
+      }
+    }
+
+    // Toast
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      const colors = {
+        success: 'bg-emerald-600/95 text-white border-emerald-500',
+        error: 'bg-rose-600/95 text-white border-rose-500',
+        info: 'bg-indigo-600/95 text-white border-indigo-500',
+      };
+      toast.className = `${colors[type] || colors.info} border px-4 py-3 rounded-xl shadow-xl text-xs sm:text-sm font-medium flex items-center gap-2 pointer-events-auto transition-all transform duration-300 translate-y-2 opacity-0`;
+      toast.innerHTML = `<span>${message}</span>`;
+      
+      const box = document.getElementById('toast-box');
+      box.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // Tab Switching (Admin only)
+    function switchTab(tabId) {
+      if (currentAuth && currentAuth.role !== 'admin') return;
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('text-white', 'bg-indigo-600', 'shadow');
+        btn.classList.add('text-slate-400');
+      });
+
+      document.querySelectorAll('.tab-btn-m').forEach(btn => {
+        btn.classList.remove('text-white', 'bg-indigo-600', 'shadow');
+        btn.classList.add('text-slate-400');
+      });
+
+      const activeContent = document.getElementById(`tab-${tabId}`);
+      if (activeContent) activeContent.classList.remove('hidden');
+
+      const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('text-slate-400');
+        activeBtn.classList.add('text-white', 'bg-indigo-600', 'shadow');
+      }
+
+      const activeBtnM = document.getElementById(`tab-btn-${tabId}-m`);
+      if (activeBtnM) {
+        activeBtnM.classList.remove('text-slate-400');
+        activeBtnM.classList.add('text-white', 'bg-indigo-600', 'shadow');
+      }
+
+      lucide.createIcons();
+    }
+
+    // Modal Helpers
+    function openModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
+    }
+
+    // ==============================================================
+    // CLIENT PORTAL LOGIC
+    // ==============================================================
+    async function loadClientPortal() {
+      try {
+        const [resInfo, resDevices] = await Promise.all([
+          fetch('/api/my/info'),
+          fetch('/api/my/devices')
+        ]);
+        
+        clientInfoData = await resInfo.json();
+        clientDevicesData = await resDevices.json();
+
+        document.getElementById('client-name').innerText = clientInfoData.username;
+        document.getElementById('client-subnet-badge').innerText = `ID #${clientInfoData.user_index_y} (10.*.${clientInfoData.user_index_y}.*)`;
+        const connsCount = (clientInfoData.connections || []).length;
+        document.getElementById('client-conn-name').innerText = `${connsCount} серв. / подкл.`;
+        document.getElementById('client-server-host').innerText = clientInfoData.server_host || '—';
+        document.getElementById('client-device-counter').innerText = `${clientDevicesData.length} устройств`;
+
+        renderClientDevices();
+      } catch (err) {
+        showToast('Ошибка загрузки данных личного кабинета: ' + err, 'error');
+      }
+    }
+
+    function renderClientDevices() {
+      const container = document.getElementById('client-devices-container');
+      const emptyEl = document.getElementById('client-devices-empty');
+
+      if (!clientDevicesData.length) {
+        container.innerHTML = '';
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+
+      emptyEl.classList.add('hidden');
+
+      container.innerHTML = `
+        <!-- Desktop Table (>= sm) -->
+        <div class="hidden sm:block overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="text-slate-400 border-b border-slate-800/60 uppercase text-[10px] tracking-wider">
+              <tr>
+                <th class="py-2.5 px-3">Устройство</th>
+                <th class="py-2.5 px-3">Локация / Подключение</th>
+                <th class="py-2.5 px-3">Выделенный IP</th>
+                <th class="py-2.5 px-3">Статус</th>
+                <th class="py-2.5 px-3 text-right">Действия</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/40 font-mono">
+              ${clientDevicesData.map(p => `
+                <tr class="hover:bg-slate-800/20">
+                  <td class="py-3 px-3 font-sans font-medium text-white flex items-center gap-2">
+                    <i data-lucide="${getDeviceIcon(p.label)}" class="w-4 h-4 text-indigo-400 shrink-0"></i>
+                    <span class="truncate">${escapeHtml(p.label)}</span>
+                  </td>
+                  <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-sans text-xs border border-slate-700/60">
+                      ${escapeHtml(p.server_name || 'Основной')} <span class="text-indigo-400 font-mono">(${escapeHtml(p.connection_name)})</span>
+                    </span>
+                  </td>
+                  <td class="py-3 px-3 text-indigo-300 font-semibold">${escapeHtml(p.client_ip)}</td>
+                  <td class="py-3 px-3">
+                    <button onclick="toggleMyDevice(${p.id})" class="px-2.5 py-1 rounded text-xs font-sans font-semibold transition active:scale-95 ${p.is_enabled ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-500'}">
+                      ${p.is_enabled ? 'Активен' : 'Отключен'}
+                    </button>
+                  </td>
+                  <td class="py-3 px-3 text-right font-sans">
+                    <div class="inline-flex items-center gap-1.5">
+                      <button onclick="showMyDeviceQrModal(${p.id}, '${escapeHtml(p.label)}')" title="Показать QR-код" class="p-2 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded-lg transition active:scale-95 flex items-center gap-1">
+                        <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+                        <span class="text-xs font-medium">QR</span>
+                      </button>
+                      <a href="/api/my/devices/${p.id}/download" title="Скачать файл конфигурации" class="p-2 bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white rounded-lg transition active:scale-95 inline-flex items-center gap-1">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span class="text-xs font-medium">.conf</span>
+                      </a>
+                      <button onclick="deleteMyDeviceConfirm(${p.id}, '${escapeHtml(p.label)}')" title="Удалить устройство" class="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition active:scale-95">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Mobile Card View (< sm) -->
+        <div class="sm:hidden space-y-2.5">
+          ${clientDevicesData.map(p => `
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 space-y-2.5">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <div class="w-8 h-8 rounded-lg bg-indigo-600/10 text-indigo-400 flex items-center justify-center shrink-0">
+                    <i data-lucide="${getDeviceIcon(p.label)}" class="w-4 h-4"></i>
+                  </div>
+                  <div class="min-w-0">
+                    <span class="font-medium text-white text-sm block truncate">${escapeHtml(p.label)}</span>
+                    <div class="flex items-center gap-1.5 mt-0.5">
+                      <span class="font-mono text-xs text-indigo-300">${escapeHtml(p.client_ip)}</span>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${escapeHtml(p.server_name || 'Основной')} • ${escapeHtml(p.connection_name)}</span>
+                    </div>
+                  </div>
+                </div>
+                <button onclick="toggleMyDevice(${p.id})" class="px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition active:scale-95 ${p.is_enabled ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 border border-slate-700'}">
+                  ${p.is_enabled ? '● Вкл' : '○ Откл'}
+                </button>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2 pt-1 border-t border-slate-800/60">
+                <button onclick="showMyDeviceQrModal(${p.id}, '${escapeHtml(p.label)}')" class="py-2 px-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 font-medium text-xs rounded-lg flex items-center justify-center gap-1.5 transition active:scale-95">
+                  <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+                  <span>QR</span>
+                </button>
+                <a href="/api/my/devices/${p.id}/download" class="py-2 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs rounded-lg flex items-center justify-center gap-1.5 transition active:scale-95">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                  <span>.conf</span>
+                </a>
+                <button onclick="deleteMyDeviceConfirm(${p.id}, '${escapeHtml(p.label)}')" class="py-2 px-2 bg-slate-800/60 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 font-medium text-xs rounded-lg flex items-center justify-center gap-1.5 transition active:scale-95">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  <span>Удалить</span>
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      lucide.createIcons();
+    }
+
+    function openMyCreateDeviceModal() {
+      const conns = clientInfoData.connections || [];
+      const select = document.getElementById('my-device-conn-id');
+      if (conns.length) {
+        select.innerHTML = conns.map(c => `
+          <option value="${c.id}" data-subnet="${c.subnet}">
+            ${escapeHtml(c.server_name || 'Основной')} — ${escapeHtml(c.name)} (AWG ${c.protocol_version})
+          </option>
+        `).join('');
+      } else {
+        select.innerHTML = `<option value="">По умолчанию</option>`;
+      }
+
+      document.getElementById('my-device-label').value = '';
+      document.getElementById('my-device-use-psk').checked = false;
+      updateClientPeerPreview();
+      openModal('modal-my-create-device');
+    }
+
+    function updateClientPeerPreview() {
+      const select = document.getElementById('my-device-conn-id');
+      const opt = select.options[select.selectedIndex];
+      const preview = document.getElementById('preview-my-peer-subnet');
+      if (opt && opt.getAttribute('data-subnet')) {
+        preview.innerText = opt.getAttribute('data-subnet');
+      } else if (clientInfoData && clientInfoData.subnet) {
+        preview.innerText = clientInfoData.subnet;
+      }
+    }
+
+    async function submitMyCreateDevice(e) {
+      e.preventDefault();
+      const connVal = document.getElementById('my-device-conn-id').value;
+      const payload = {
+        connection_id: connVal ? parseInt(connVal) : null,
+        label: document.getElementById('my-device-label').value.trim(),
+        use_psk: document.getElementById('my-device-use-psk').checked,
+      };
+
+      try {
+        const res = await fetch('/api/my/devices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Не удалось создать устройство');
+
+        closeModal('modal-my-create-device');
+        showToast(`Устройство ${data.label} (${data.client_ip}) добавлено!`, 'success');
+        await loadClientPortal();
+        await showMyDeviceQrModal(data.peer_id, data.label);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function showMyDeviceQrModal(peerId, label) {
+      try {
+        const res = await fetch(`/api/my/devices/${peerId}/config`);
+        if (!res.ok) throw new Error('Не удалось получить конфиг');
+        const text = await res.text();
+
+        activeModalConfigText = text;
+        document.getElementById('qr-title').innerText = label || 'Конфигурация';
+        document.getElementById('qr-config-text').value = text;
+        document.getElementById('btn-download-conf').onclick = () => {
+          window.location.href = `/api/my/devices/${peerId}/download`;
+        };
+
+        const container = document.getElementById('qrcode-container');
+        container.innerHTML = '';
+        const qrSize = Math.min(240, Math.max(180, window.innerWidth - 90));
+        qrcodeObj = new QRCode(container, {
+          text: text,
+          width: qrSize,
+          height: qrSize,
+          colorDark: '#0f172a',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M,
+        });
+
+        openModal('modal-qr');
+      } catch (err) {
+        showToast('Ошибка: ' + err, 'error');
+      }
+    }
+
+    async function toggleMyDevice(peerId) {
+      try {
+        const res = await fetch(`/api/my/devices/${peerId}/toggle`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка');
+        await loadClientPortal();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function deleteMyDeviceConfirm(peerId, label) {
+      if (!confirm(`Удалить устройство ${label}?`)) return;
+      try {
+        const res = await fetch(`/api/my/devices/${peerId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка');
+        showToast('Устройство удалено', 'success');
+        await loadClientPortal();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function openMyChangePasswordModal() {
+      document.getElementById('my-pw-old').value = '';
+      document.getElementById('my-pw-new').value = '';
+      openModal('modal-my-change-password');
+    }
+
+    async function submitMyChangePassword(e) {
+      e.preventDefault();
+      const payload = {
+        old_password: document.getElementById('my-pw-old').value,
+        new_password: document.getElementById('my-pw-new').value,
+      };
+
+      try {
+        const res = await fetch('/api/my/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка обновления пароля');
+
+        closeModal('modal-my-change-password');
+        showToast('Ваш пароль успешно изменен!', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ==============================================================
+    
+    // ==============================================================
+    // ADMIN SERVERS (NODES) LOGIC
+    // ==============================================================
+    async function loadServers(render = true) {
+      try {
+        const res = await fetch('/api/servers');
+        if (!res.ok) return;
+        serversData = await res.json();
+
+        const count = serversData.length;
+        const b1 = document.getElementById('badge-servers-count');
+        if (b1) b1.innerText = count;
+        const b2 = document.getElementById('badge-servers-count-m');
+        if (b2) b2.innerText = count;
+
+        if (render) {
+          renderServers();
+        }
+      } catch (err) {
+        console.error('Error fetching servers:', err);
+      }
+    }
+
+    function renderServers() {
+      const listEl = document.getElementById('servers-list');
+      const emptyEl = document.getElementById('servers-empty');
+      if (!listEl) return;
+
+      if (!serversData.length) {
+        listEl.innerHTML = '';
+        if (emptyEl) emptyEl.classList.remove('hidden');
+        return;
+      }
+
+      if (emptyEl) emptyEl.classList.add('hidden');
+      listEl.innerHTML = serversData.map(s => {
+        let statusBadge = '';
+        if (s.status === 'online') {
+          statusBadge = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Онлайн</span>`;
+        } else if (s.status === 'installing') {
+          statusBadge = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20"><i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Установка</span>`;
+        } else if (s.status === 'error') {
+          statusBadge = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20"><span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Ошибка</span>`;
+        } else {
+          statusBadge = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/20"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Офлайн</span>`;
+        }
+
+        const sys = s.system_info || {};
+        const cpuP = sys.cpu_percent !== undefined ? sys.cpu_percent : null;
+        const ram = sys.ram || {};
+        const ramP = ram.percent !== undefined ? ram.percent : null;
+        const uptimeSec = sys.uptime_seconds || 0;
+        const uptimeStr = uptimeSec > 0
+          ? `${Math.floor(uptimeSec / 86400)}д ${Math.floor((uptimeSec % 86400) / 3600)}ч`
+          : '—';
+
+        return `
+          <div class="bg-slate-900/40 border border-slate-800/80 hover:border-slate-700/80 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col justify-between transition-all group">
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-3">
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <div class="w-9 h-9 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+                    <i data-lucide="server" class="w-4 h-4"></i>
+                  </div>
+                  <div class="min-w-0">
+                    <h3 class="font-bold text-white text-base truncate">${escapeHtml(s.name)}</h3>
+                    <p class="text-xs text-slate-400 font-mono truncate">${escapeHtml(s.host)}:${s.ssh_port}</p>
+                  </div>
+                </div>
+                ${statusBadge}
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 my-3 text-xs">
+                <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60">
+                  <span class="text-slate-500 block text-[10px] uppercase font-semibold">Туннели</span>
+                  <span class="text-slate-200 font-mono font-bold">${s.connections_count || 0}</span>
+                </div>
+                <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60">
+                  <span class="text-slate-500 block text-[10px] uppercase font-semibold">Аптайм</span>
+                  <span class="text-slate-200 font-mono font-bold">${uptimeStr}</span>
+                </div>
+              </div>
+
+              ${cpuP !== null ? `
+                <div class="space-y-2 mb-4 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/40">
+                  <div>
+                    <div class="flex justify-between text-[11px] mb-1">
+                      <span class="text-slate-400">CPU</span>
+                      <span class="text-slate-200 font-mono font-semibold">${cpuP}%</span>
+                    </div>
+                    <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div class="bg-indigo-500 h-full rounded-full transition-all" style="width: ${Math.min(cpuP, 100)}%"></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="flex justify-between text-[11px] mb-1">
+                      <span class="text-slate-400">RAM</span>
+                      <span class="text-slate-200 font-mono font-semibold">${ramP}%</span>
+                    </div>
+                    <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div class="bg-violet-500 h-full rounded-full transition-all" style="width: ${Math.min(ramP, 100)}%"></div>
+                    </div>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="pt-3 border-t border-slate-800/60 flex items-center justify-between gap-1.5">
+              <div class="flex items-center gap-1.5">
+                <button onclick="refreshServerMetrics(${s.id})" title="Обновить метрики" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="openServerLogsModal(${s.id}, '${escapeHtml(s.name)}')" title="Логи установки" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition flex items-center gap-1">
+                  <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
+                  <span>Логи</span>
+                </button>
+              </div>
+
+              <div class="flex items-center gap-1.5">
+                <button onclick="reprovisionServer(${s.id}, '${escapeHtml(s.name)}')" title="Повторить развёртывание" class="p-2 rounded-xl bg-slate-800 hover:bg-amber-600/20 text-slate-300 hover:text-amber-400 transition">
+                  <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="deleteServerConfirm(${s.id}, '${escapeHtml(s.name)}')" title="Удалить сервер" class="p-2 rounded-xl bg-slate-800 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 transition">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    function setAuthType(type) {
+      currentAuthType = type;
+      const bPass = document.getElementById('auth-type-pass');
+      const bKey = document.getElementById('auth-type-key');
+      const fPass = document.getElementById('auth-field-pass');
+      const fKey = document.getElementById('auth-field-key');
+
+      if (type === 'password') {
+        bPass.className = 'py-2 text-xs font-semibold rounded-xl bg-indigo-600 text-white border border-indigo-500 transition';
+        bKey.className = 'py-2 text-xs font-semibold rounded-xl bg-slate-950 text-slate-400 border border-slate-800 hover:text-white transition';
+        fPass.classList.remove('hidden');
+        fKey.classList.add('hidden');
+      } else {
+        bKey.className = 'py-2 text-xs font-semibold rounded-xl bg-indigo-600 text-white border border-indigo-500 transition';
+        bPass.className = 'py-2 text-xs font-semibold rounded-xl bg-slate-950 text-slate-400 border border-slate-800 hover:text-white transition';
+        fKey.classList.remove('hidden');
+        fPass.classList.add('hidden');
+      }
+    }
+
+    function openAddServerModal() {
+      document.getElementById('srv-name').value = '';
+      document.getElementById('srv-host').value = '';
+      document.getElementById('srv-ssh-port').value = '22';
+      document.getElementById('srv-ssh-user').value = 'root';
+      document.getElementById('srv-ssh-pass').value = '';
+      document.getElementById('srv-ssh-key').value = '';
+      setAuthType('password');
+      openModal('modal-add-server');
+    }
+
+    async function submitAddServer(e) {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById('srv-name').value.trim(),
+        host: document.getElementById('srv-host').value.trim(),
+        ssh_port: parseInt(document.getElementById('srv-ssh-port').value) || 22,
+        ssh_user: document.getElementById('srv-ssh-user').value.trim() || 'root',
+        ssh_password: currentAuthType === 'password' ? document.getElementById('srv-ssh-pass').value : '',
+        ssh_key: currentAuthType === 'key' ? document.getElementById('srv-ssh-key').value.trim() : '',
+        api_port: 8089,
+      };
+
+      try {
+        const res = await fetch('/api/servers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка добавления сервера');
+
+        closeModal('modal-add-server');
+        showToast(data.message, 'success');
+        openServerLogsModal(data.server_id, payload.name);
+        loadServers(false);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function openServerLogsModal(serverId, serverName) {
+      document.getElementById('logs-server-subtitle').innerText = `${serverName} (ID: ${serverId})`;
+      document.getElementById('server-logs-terminal').innerText = 'Подключение по SSH и запуск процесса...';
+      const badge = document.getElementById('logs-status-badge');
+      if (badge) {
+        badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1.5';
+        badge.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Развёртывание...';
+        lucide.createIcons();
+      }
+      openModal('modal-server-logs');
+
+      pollServerLogs(serverId);
+      if (logPollTimer) clearInterval(logPollTimer);
+      logPollTimer = setInterval(() => pollServerLogs(serverId), 1500);
+    }
+
+    async function pollServerLogs(serverId) {
+      try {
+        const res = await fetch(`/api/servers/${serverId}/logs`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const term = document.getElementById('server-logs-terminal');
+        if (term && data.logs) {
+          term.innerText = data.logs;
+          term.scrollTop = term.scrollHeight;
+        }
+
+        const badge = document.getElementById('logs-status-badge');
+        if (badge) {
+          const isDone = data.logs && data.logs.includes('=== Развёртывание ноды') && (data.logs.includes('завершено') || data.logs.includes('успешно'));
+          if (data.status === 'online' && isDone) {
+            badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+            badge.innerHTML = '● Развёрнут успешно!';
+            if (logPollTimer) { clearInterval(logPollTimer); logPollTimer = null; }
+            loadServers(false);
+          } else if (data.status === 'error') {
+            badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20';
+            badge.innerHTML = '⚠ Ошибка установки';
+            if (logPollTimer) { clearInterval(logPollTimer); logPollTimer = null; }
+            loadServers(false);
+          } else {
+            badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1.5';
+            badge.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Развёртывание...';
+            lucide.createIcons();
+          }
+        }
+      } catch (err) {
+        console.error('Error polling logs:', err);
+      }
+    }
+
+    function closeServerLogsModal() {
+      if (logPollTimer) {
+        clearInterval(logPollTimer);
+        logPollTimer = null;
+      }
+      closeModal('modal-server-logs');
+      loadServers();
+    }
+
+    async function refreshServerMetrics(serverId) {
+      try {
+        showToast('Опрос состояния ноды...', 'info');
+        const res = await fetch(`/api/servers/${serverId}/metrics`);
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Ошибка связи');
+        showToast('Метрики сервера обновлены', 'success');
+        await loadServers();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function reprovisionServer(serverId, serverName) {
+      if (!confirm(`Запустить повторное развёртывание ноды ${serverName}?`)) return;
+      try {
+        const res = await fetch(`/api/servers/${serverId}/provision`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка запуска');
+        showToast(data.message, 'info');
+        openServerLogsModal(serverId, serverName);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function deleteServerConfirm(serverId, serverName) {
+      if (!confirm(`Вы действительно хотите удалить сервер ${serverName}?`)) return;
+      try {
+        const res = await fetch(`/api/servers/${serverId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка удаления');
+        showToast(data.message, 'success');
+        await loadServers();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ADMIN CONNECTIONS LOGIC
+    // ==============================================================
+    async function loadConnections(render = true) {
+      try {
+        const res = await fetch('/api/connections');
+        if (!res.ok) return;
+        connectionsData = await res.json();
+        
+        const count = connectionsData.length;
+        const b1 = document.getElementById('badge-conns-count');
+        if (b1) b1.innerText = count;
+        const b2 = document.getElementById('badge-conns-count-m');
+        if (b2) b2.innerText = count;
+
+        if (render) {
+          renderConnections();
+        }
+      } catch (err) {
+        console.error('Error fetching connections:', err);
+      }
+    }
+
+    function renderConnections() {
+      const listEl = document.getElementById('connections-list');
+      const emptyEl = document.getElementById('connections-empty');
+
+      if (!connectionsData.length) {
+        listEl.innerHTML = '';
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+
+      emptyEl.classList.add('hidden');
+      listEl.innerHTML = connectionsData.map(c => {
+        const isRunning = c.is_active || (c.live && c.live.is_running);
+        const statusBadge = isRunning
+          ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Активен</span>`
+          : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20"><span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Остановлен</span>`;
+
+        return `
+          <div class="bg-slate-900/40 border border-slate-800/80 hover:border-slate-700/80 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col justify-between transition-all group">
+            <div>
+              <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-indigo-400 font-mono font-bold text-sm shrink-0">
+                    ${c.name}
+                  </div>
+                  <div class="min-w-0">
+                    <h3 class="font-bold text-white text-base truncate">${c.name}</h3>
+                    <div class="flex items-center gap-1.5 text-xs text-slate-400 flex-wrap">
+                      <span class="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 font-mono text-[10px]">AWG ${c.protocol_version}</span>
+                      <span class="inline-flex items-center gap-1 text-[11px] text-indigo-300 font-mono bg-slate-950/80 px-1.5 py-0.5 rounded border border-indigo-500/20">
+                        <i data-lucide="server" class="w-3 h-3"></i> ${escapeHtml(c.server_name || c.server_host || 'Нода')}
+                      </span>
+                      <span>Порт: ${c.listen_port}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="shrink-0">${statusBadge}</div>
+              </div>
+
+              <div class="py-3.5 space-y-2 text-xs">
+                <div class="flex justify-between items-center text-slate-300">
+                  <span class="text-slate-400">Подсеть AWG:</span>
+                  <span class="font-mono bg-slate-950 px-2 py-0.5 rounded text-indigo-300 border border-slate-800">10.${c.x_subnet}.0.0/16</span>
+                </div>
+                <div class="flex justify-between items-center text-slate-300">
+                  <span class="text-slate-400">XRAY TProxy:</span>
+                  <span class="font-medium text-amber-300">Порт ${c.xray_port} (Табл. ${c.table_num}, Mark ${c.fwmark})</span>
+                </div>
+                <div class="flex justify-between items-center text-slate-300">
+                  <span class="text-slate-400">Клиенты:</span>
+                  <span class="text-slate-200">${c.user_count} польз. / ${c.peer_count} пиров</span>
+                </div>
+                <div class="flex justify-between items-center text-slate-300">
+                  <span class="text-slate-400 shrink-0">Симлинк:</span>
+                  <span class="font-mono text-[11px] text-slate-400 truncate max-w-[170px] sm:max-w-[220px]" title="/etc/amnezia/amneziawg/${c.name}.conf">/etc/amnezia/.../${c.name}.conf</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5">
+                ${isRunning 
+                  ? `<button onclick="controlConnection(${c.id}, 'stop')" title="Остановить" class="p-2 sm:p-2.5 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition active:scale-95">
+                      <i data-lucide="square" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="controlConnection(${c.id}, 'restart')" title="Перезапустить" class="p-2 sm:p-2.5 rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-white transition active:scale-95">
+                      <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                    </button>`
+                  : `<button onclick="controlConnection(${c.id}, 'start')" title="Запустить" class="p-2 sm:p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition active:scale-95">
+                      <i data-lucide="play" class="w-4 h-4"></i>
+                    </button>`
+                }
+                <button onclick="viewServerConfig(${c.id}, '${c.name}')" title="Просмотр .conf" class="p-2 sm:p-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition active:scale-95">
+                  <i data-lucide="file-code" class="w-4 h-4"></i>
+                </button>
+              </div>
+
+              <button onclick="deleteConnectionConfirm(${c.id}, '${c.name}')" title="Удалить подключение" class="p-2 sm:p-2.5 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition active:scale-95">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    async function openCreateConnectionModal() {
+      try {
+        const res = await fetch('/api/connections/next-defaults');
+        nextDefaults = await res.json();
+
+        document.getElementById('conn-name').value = nextDefaults.suggested_name;
+        document.getElementById('conn-x-subnet').value = nextDefaults.suggested_x_subnet;
+        document.getElementById('preview-x').innerText = nextDefaults.suggested_x_subnet;
+        document.getElementById('conn-table').value = nextDefaults.suggested_table;
+        document.getElementById('conn-fwmark').value = nextDefaults.suggested_fwmark;
+        document.getElementById('conn-port').value = nextDefaults.suggested_listen_port;
+        document.getElementById('conn-xray-port').value = nextDefaults.suggested_xray_port;
+
+        document.getElementById('conn-x-subnet').addEventListener('input', (e) => {
+          document.getElementById('preview-x').innerText = e.target.value || '13';
+        });
+
+        const srvSelect = document.getElementById('conn-server-id');
+        if (srvSelect && serversData.length) {
+          srvSelect.innerHTML = serversData.map(s => `
+            <option value="${s.id}">${escapeHtml(s.name)} (${escapeHtml(s.host)}) — ${s.status === 'online' ? '● Онлайн' : s.status}</option>
+          `).join('');
+        }
+
+        onProtocolChange('1.0');
+        openModal('modal-create-conn');
+      } catch (err) {
+        showToast('Ошибка загрузки параметров: ' + err, 'error');
+      }
+    }
+
+    function onProtocolChange(version) {
+      currentProtocol = version;
+      if (!nextDefaults || !nextDefaults.params_preview) return;
+
+      const p = nextDefaults.params_preview[version];
+      let html = '';
+      for (const [k, v] of Object.entries(p)) {
+        html += `<div class="flex justify-between py-0.5"><span class="text-slate-400">${k}:</span> <span class="text-indigo-300 font-mono break-all font-semibold">${v}</span></div>`;
+      }
+      document.getElementById('params-preview-box').innerHTML = html;
+    }
+
+    async function regenerateParams(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      try {
+        const res = await fetch('/api/connections/next-defaults');
+        const data = await res.json();
+        if (data && data.params_preview) {
+          nextDefaults.params_preview = data.params_preview;
+          onProtocolChange(currentProtocol);
+          showToast('Сгенерированы новые параметры обфускации', 'info');
+        }
+      } catch (err) {
+        showToast('Не удалось обновить параметры: ' + err, 'error');
+      }
+    }
+
+    function toggleParamsPreview() {
+      const box = document.getElementById('params-preview-box');
+      const arrow = document.getElementById('preview-arrow');
+      box.classList.toggle('hidden');
+      if (!box.classList.contains('hidden')) {
+        arrow.classList.add('rotate-180');
+      } else {
+        arrow.classList.remove('rotate-180');
+      }
+    }
+
+    async function submitCreateConnection(e) {
+      e.preventDefault();
+      const chosenParams = (nextDefaults && nextDefaults.params_preview && nextDefaults.params_preview[currentProtocol])
+        ? nextDefaults.params_preview[currentProtocol]
+        : undefined;
+
+      const payload = {
+        server_id: parseInt(document.getElementById('conn-server-id').value) || 1,
+        name: document.getElementById('conn-name').value.trim(),
+        protocol_version: currentProtocol,
+        x_subnet: parseInt(document.getElementById('conn-x-subnet').value),
+        listen_port: parseInt(document.getElementById('conn-port').value),
+        xray_port: parseInt(document.getElementById('conn-xray-port').value),
+        table_num: parseInt(document.getElementById('conn-table').value),
+        fwmark: parseInt(document.getElementById('conn-fwmark').value),
+        params: chosenParams,
+      };
+
+      try {
+        const res = await fetch('/api/connections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Не удалось создать подключение');
+
+        closeModal('modal-create-conn');
+        showToast(`Подключение ${payload.name} успешно создано!`, 'success');
+        await loadConnections();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function controlConnection(id, action) {
+      try {
+        showToast(`Выполняется: ${action}...`, 'info');
+        const res = await fetch(`/api/connections/${id}/${action}`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка команды');
+
+        showToast(data.message || 'Готово', 'success');
+        await loadConnections();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function deleteConnectionConfirm(id, name) {
+      if (!confirm(`Вы действительно хотите удалить подключение ${name}? Все пользователи и симлинки будут удалены.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/connections/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка удаления');
+
+        showToast(`Подключение ${name} удалено`, 'success');
+        await loadConnections();
+        await loadUsers();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function viewServerConfig(id, name) {
+      try {
+        const res = await fetch(`/api/connections/${id}/config`);
+        const text = await res.text();
+        document.getElementById('server-conf-title').innerText = `Конфигурация ${name}.conf`;
+        document.getElementById('server-conf-path').innerText = `/etc/amnezia/amneziawg/${name}/${name}.conf`;
+        document.getElementById('server-conf-text').value = text;
+        openModal('modal-server-conf');
+      } catch (err) {
+        showToast('Не удалось загрузить конфиг: ' + err, 'error');
+      }
+    }
+
+    // ==============================================================
+    // ADMIN USERS & PEERS LOGIC
+    // ==============================================================
+    async function loadUsers() {
+      try {
+        const res = await fetch('/api/users');
+        if (!res.ok) return;
+        usersData = await res.json();
+        
+        const count = usersData.length;
+        const b1 = document.getElementById('badge-users-count');
+        if (b1) b1.innerText = count;
+        const b2 = document.getElementById('badge-users-count-m');
+        if (b2) b2.innerText = count;
+
+        renderUsers();
+      } catch (err) {
+        console.error('Error fetching users:', err);
+      }
+    }
+
+    function renderUsers() {
+      const listEl = document.getElementById('users-list');
+      const emptyEl = document.getElementById('users-empty');
+
+      if (!usersData.length) {
+        listEl.innerHTML = '';
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+
+      emptyEl.classList.add('hidden');
+      listEl.innerHTML = usersData.map(u => {
+        const subnetStr = `10.*.${u.user_index_y}.0/24`;
+        const peersList = u.peers || [];
+
+        const pwBadge = u.has_password
+          ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">🔑 Пароль задан</span>`
+          : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-500 border border-slate-700 font-medium">Без пароля</span>`;
+
+        return `
+          <div class="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
+            <!-- User Header -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div class="flex items-start sm:items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold shrink-0 mt-0.5 sm:mt-0">
+                  <i data-lucide="user" class="w-5 h-5"></i>
+                </div>
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <h3 class="font-bold text-white text-base truncate">${escapeHtml(u.username)}</h3>
+                    <span class="text-[11px] sm:text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 font-mono border border-indigo-500/20">Подсеть: ${subnetStr}</span>
+                    <span class="text-[11px] sm:text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium">Глобальный</span>
+                    ${pwBadge}
+                  </div>
+                  <p class="text-xs text-slate-400 mt-1 sm:mt-0.5">${escapeHtml(u.notes || 'Без примечаний')} • Устройств: ${peersList.length}</p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2 self-end sm:self-center w-full sm:w-auto justify-between sm:justify-start pt-1 sm:pt-0">
+                <button onclick="openCreatePeerModal(${u.id}, '${escapeHtml(u.username)}', ${u.user_index_y})" class="flex-1 sm:flex-initial justify-center px-3.5 py-2 sm:py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition active:scale-95">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  <span>Добавить устройство</span>
+                </button>
+                <button onclick="openResetUserPasswordModal(${u.id}, '${escapeHtml(u.username)}')" title="Задать / сбросить пароль для входа" class="p-2 sm:p-1.5 text-slate-400 hover:text-indigo-300 hover:bg-indigo-600/20 rounded-xl transition active:scale-95">
+                  <i data-lucide="key" class="w-4 h-4"></i>
+                </button>
+                <button onclick="deleteUserConfirm(${u.id}, '${escapeHtml(u.username)}')" class="p-2 sm:p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition active:scale-95" title="Удалить пользователя">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Devices List -->
+            ${peersList.length ? `
+              <div class="hidden sm:block overflow-x-auto">
+                <table class="w-full text-left text-xs text-slate-300">
+                  <thead class="text-slate-400 border-b border-slate-800/60 uppercase text-[10px] tracking-wider">
+                    <tr>
+                      <th class="py-2 px-3">Ярлык</th>
+                      <th class="py-2 px-3">Подключение / Сервер</th>
+                      <th class="py-2 px-3">Выделенный IP</th>
+                      <th class="py-2 px-3">Статус</th>
+                      <th class="py-2 px-3 text-right">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-800/40 font-mono">
+                    ${peersList.map(p => `
+                      <tr class="hover:bg-slate-800/20">
+                        <td class="py-2.5 px-3 font-sans font-medium text-white flex items-center gap-2">
+                          <i data-lucide="${getDeviceIcon(p.label)}" class="w-4 h-4 text-indigo-400 shrink-0"></i>
+                          <span class="truncate">${escapeHtml(p.label)}</span>
+                        </td>
+                        <td class="py-2.5 px-3">
+                          <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-sans text-xs border border-slate-700/60">
+                            ${escapeHtml(p.connection_name || '')} <span class="text-indigo-400 font-mono">(${escapeHtml(p.server_name || '')})</span>
+                          </span>
+                        </td>
+                        <td class="py-2.5 px-3 text-indigo-300 font-semibold">${escapeHtml(p.client_ip)}</td>
+                        <td class="py-2.5 px-3">
+                          <button onclick="togglePeer(${p.id})" class="px-2 py-0.5 rounded text-[10px] font-sans font-semibold ${p.is_enabled ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-500'}">
+                            ${p.is_enabled ? 'Активен' : 'Отключен'}
+                          </button>
+                        </td>
+                        <td class="py-2.5 px-3 text-right font-sans">
+                          <div class="inline-flex items-center gap-1">
+                            <button onclick="showQrModal(${p.id}, '${escapeHtml(u.username)}', '${escapeHtml(p.label)}')" title="QR-код и конфиг" class="p-1.5 bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white rounded-lg transition active:scale-95">
+                              <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <a href="/api/peers/${p.id}/download" title="Скачать .conf" class="p-1.5 bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white rounded-lg transition inline-flex items-center justify-center active:scale-95">
+                              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                            </a>
+                            <button onclick="deletePeerConfirm(${p.id}, '${escapeHtml(p.label)}')" title="Удалить" class="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition active:scale-95">
+                              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="sm:hidden space-y-2.5">
+                ${peersList.map(p => `
+                  <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 space-y-2.5">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-600/10 text-indigo-400 flex items-center justify-center shrink-0">
+                          <i data-lucide="${getDeviceIcon(p.label)}" class="w-4 h-4"></i>
+                        </div>
+                        <div class="min-w-0">
+                          <span class="font-medium text-white text-sm block truncate">${escapeHtml(p.label)}</span>
+                          <div class="flex items-center gap-1.5 mt-0.5">
+                            <span class="font-mono text-xs text-indigo-300">${escapeHtml(p.client_ip)}</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${escapeHtml(p.connection_name)} • ${escapeHtml(p.server_name)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <button onclick="togglePeer(${p.id})" class="px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition active:scale-95 ${p.is_enabled ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 border border-slate-700'}">
+                        ${p.is_enabled ? '● Вкл' : '○ Откл'}
+                      </button>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 pt-1 border-t border-slate-800/60">
+                      <button onclick="showQrModal(${p.id}, '${escapeHtml(u.username)}', '${escapeHtml(p.label)}')" class="py-2 px-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 font-medium text-xs rounded-lg flex items-center justify-center gap-1.5 transition active:scale-95">
+                        <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+                        <span>QR</span>
+                      </button>
+                      <a href="/api/peers/${p.id}/download" class="py-2 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs rounded-lg flex items-center justify-center gap-1.5 transition active:scale-95">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span>.conf</span>
+                      </a>
+                      <button onclick="deletePeerConfirm(${p.id}, '${escapeHtml(p.label)}')" class="py-2 px-2 bg-slate-800/60 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 font-medium text-xs rounded-lg flex items-center justify-center gap-1.5 transition active:scale-95">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        <span>Удалить</span>
+                      </button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : `
+              <div class="py-4 text-center text-xs text-slate-500">
+                У пользователя пока нет созданных устройств. Нажмите «Добавить устройство».
+              </div>
+            `}
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function getDeviceIcon(label) {
+      const l = (label || '').toLowerCase();
+      if (l.includes('phone') || l.includes('iphone') || l.includes('телефон') || l.includes('android') || l.includes('айфон')) return 'smartphone';
+      if (l.includes('pc') || l.includes('комп') || l.includes('пк') || l.includes('ноут') || l.includes('mac') || l.includes('laptop')) return 'laptop';
+      if (l.includes('tv') || l.includes('тв') || l.includes('телевизор')) return 'tv';
+      if (l.includes('router') || l.includes('роутер') || l.includes('keenetic') || l.includes('wrt') || l.includes('mikrotik')) return 'router';
+      return 'hard-drive';
+    }
+
+    function generateRandomPasswordString(length = 10) {
+      const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let pass = '';
+      for (let i = 0; i < length; i++) {
+        pass += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return pass;
+    }
+
+    function generateRandomUserPassword() {
+      document.getElementById('user-password').value = generateRandomPasswordString(10);
+    }
+
+    function generateRandomResetPassword() {
+      document.getElementById('reset-user-pw-input').value = generateRandomPasswordString(10);
+    }
+
+    function openCreateUserModal() {
+      document.getElementById('user-username').value = '';
+      document.getElementById('user-password').value = '';
+      document.getElementById('user-notes').value = '';
+      openModal('modal-create-user');
+    }
+
+    async function submitCreateUser(e) {
+      e.preventDefault();
+      const payload = {
+        username: document.getElementById('user-username').value.trim(),
+        password: document.getElementById('user-password').value.trim(),
+        notes: document.getElementById('user-notes').value.trim(),
+      };
+
+      try {
+        const res = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Не удалось создать пользователя');
+
+        closeModal('modal-create-user');
+        showToast(`Пользователь ${data.username} создан!`, 'success');
+        await loadUsers();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function openResetUserPasswordModal(userId, username) {
+      document.getElementById('reset-user-pw-id').value = userId;
+      document.getElementById('reset-user-pw-title').innerText = `Пароль для: ${username}`;
+      document.getElementById('reset-user-pw-input').value = generateRandomPasswordString(10);
+      openModal('modal-reset-user-password');
+    }
+
+    async function submitResetUserPassword(e) {
+      e.preventDefault();
+      const userId = document.getElementById('reset-user-pw-id').value;
+      const password = document.getElementById('reset-user-pw-input').value.trim();
+
+      try {
+        const res = await fetch(`/api/users/${userId}/reset-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка сохранения пароля');
+
+        closeModal('modal-reset-user-password');
+        showToast(data.message || 'Пароль сохранен!', 'success');
+        await loadUsers();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function deleteUserConfirm(id, username) {
+      if (!confirm(`Удалить пользователя ${username} и все его устройства?`)) return;
+
+      try {
+        const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка');
+
+        showToast(`Пользователь ${username} удален`, 'success');
+        await loadUsers();
+        await loadConnections(false);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    let activePeerUserY = 1;
+
+    function openCreatePeerModal(userId, username, userY) {
+      activePeerUserY = userY || 1;
+      document.getElementById('peer-user-id').value = userId;
+      document.getElementById('peer-label').value = '';
+      document.getElementById('peer-use-psk').checked = false;
+
+      const select = document.getElementById('peer-conn-id');
+      if (connectionsData && connectionsData.length) {
+        select.innerHTML = connectionsData.map(c => `
+          <option value="${c.id}" data-x="${c.x_subnet}">
+            ${escapeHtml(c.name)} (${escapeHtml(c.server_name || 'Основной')} • AWG ${c.protocol_version})
+          </option>
+        `).join('');
+      } else {
+        select.innerHTML = `<option value="">Нет подключений</option>`;
+      }
+
+      updateAdminPeerPreview();
+      openModal('modal-create-peer');
+    }
+
+    function updateAdminPeerPreview() {
+      const select = document.getElementById('peer-conn-id');
+      const opt = select.options[select.selectedIndex];
+      const preview = document.getElementById('preview-peer-subnet');
+      if (opt && opt.getAttribute('data-x')) {
+        const x = opt.getAttribute('data-x');
+        preview.innerText = `10.${x}.${activePeerUserY}.0/24`;
+      }
+    }
+
+    async function submitCreatePeer(e) {
+      e.preventDefault();
+      const connVal = document.getElementById('peer-conn-id').value;
+      const payload = {
+        user_id: parseInt(document.getElementById('peer-user-id').value),
+        connection_id: connVal ? parseInt(connVal) : null,
+        label: document.getElementById('peer-label').value.trim(),
+        use_psk: document.getElementById('peer-use-psk').checked,
+      };
+
+      try {
+        const res = await fetch('/api/peers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Не удалось создать устройство');
+
+        closeModal('modal-create-peer');
+        showToast(`Устройство ${data.label} (${data.client_ip}) добавлено!`, 'success');
+        await loadUsers();
+        await loadConnections(false);
+        await showQrModal(data.peer_id, '', data.label);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function togglePeer(peerId) {
+      try {
+        const res = await fetch(`/api/peers/${peerId}/toggle`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка');
+        await loadUsers();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function deletePeerConfirm(peerId, label) {
+      if (!confirm(`Удалить конфиг ${label}?`)) return;
+      try {
+        const res = await fetch(`/api/peers/${peerId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка');
+
+        showToast('Конфигурация удалена', 'success');
+        await loadUsers();
+        await loadConnections(false);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ==============================================================
+    // QR CODE & EXPORT MODAL (Shared)
+    // ==============================================================
+    async function showQrModal(peerId, username, label) {
+      try {
+        const res = await fetch(`/api/peers/${peerId}/config`);
+        if (!res.ok) throw new Error('Не удалось получить конфиг');
+        const text = await res.text();
+
+        activeModalConfigText = text;
+        document.getElementById('qr-title').innerText = label || 'Конфигурация';
+        document.getElementById('qr-config-text').value = text;
+        document.getElementById('btn-download-conf').onclick = () => {
+          window.location.href = `/api/peers/${peerId}/download`;
+        };
+
+        const container = document.getElementById('qrcode-container');
+        container.innerHTML = '';
+        
+        const qrSize = Math.min(240, Math.max(180, window.innerWidth - 90));
+        qrcodeObj = new QRCode(container, {
+          text: text,
+          width: qrSize,
+          height: qrSize,
+          colorDark: '#0f172a',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M,
+        });
+
+        openModal('modal-qr');
+      } catch (err) {
+        showToast('Ошибка: ' + err, 'error');
+      }
+    }
+
+    function copyModalConfig() {
+      navigator.clipboard.writeText(activeModalConfigText).then(() => {
+        showToast('Конфиг скопирован в буфер обмена!', 'success');
+      }).catch(() => {
+        showToast('Не удалось скопировать', 'error');
+      });
+    }
+
+    // ==============================================================
+    // ADMIN SETTINGS & SYSTEM LOGIC
+    // ==============================================================
+    async function loadSettings() {
+      try {
+        const res = await fetch('/api/settings');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        document.getElementById('setting-server-host').value = data.server_host || '';
+        document.getElementById('setting-default-dns').value = data.default_dns || '1.1.1.1, 8.8.8.8';
+        document.getElementById('setting-default-mtu').value = data.default_mtu || 1200;
+
+        document.getElementById('sys-os').innerText = data.os_info;
+      } catch (err) {
+        console.error('Error loading settings:', err);
+      }
+    }
+
+    async function autoDetectIp() {
+      try {
+        showToast('Определяем внешний IP...', 'info');
+        const res = await fetch('https://api.ipify.org?format=json');
+        const data = await res.json();
+        if (data.ip) {
+          document.getElementById('setting-server-host').value = data.ip;
+          showToast(`IP определен: ${data.ip}`, 'success');
+        }
+      } catch (err) {
+        showToast('Не удалось автоматически определить IP', 'error');
+      }
+    }
+
+    async function saveSettings(e) {
+      e.preventDefault();
+      const payload = {
+        server_host: document.getElementById('setting-server-host').value.trim(),
+        default_dns: document.getElementById('setting-default-dns').value.trim(),
+        default_mtu: parseInt(document.getElementById('setting-default-mtu').value),
+      };
+
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка сохранения');
+
+        showToast('Настройки сохранены', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function loadSystemStatus() {
+      try {
+        const res = await fetch('/api/system/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('sys-os').innerText = data.os;
+        document.getElementById('sys-python').innerText = data.python;
+        document.getElementById('sys-disk').innerText = `${data.disk_free_gb} ГБ из ${data.disk_total_gb} ГБ`;
+      } catch (err) {
+        console.error('Error loading system status:', err);
+      }
+    }
+
+    async function handleLogout() {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.href = '/login';
+      } catch (err) {
+        window.location.href = '/login';
+      }
+    }
+
+    async function handleChangePassword(e) {
+      e.preventDefault();
+      const new_username = document.getElementById('admin-new-user').value.trim();
+      const old_password = document.getElementById('admin-old-pass').value;
+      const new_password = document.getElementById('admin-new-pass').value;
+
+      try {
+        const res = await fetch('/api/auth/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ new_username, old_password, new_password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Не удалось обновить пароль');
+
+        showToast('Пароль успешно изменен!', 'success');
+        document.getElementById('admin-old-pass').value = '';
+        document.getElementById('admin-new-pass').value = '';
+        document.getElementById('admin-new-user').value = '';
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+  </script>
+</body>
+</html>

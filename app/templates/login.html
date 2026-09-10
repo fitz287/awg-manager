@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Вход — AmneziaWG Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            dark: {
+              850: '#141b2d',
+              900: '#0f172a',
+              950: '#080d1a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-dark-950 text-slate-100 min-h-screen flex items-center justify-center p-4 font-sans selection:bg-indigo-500 selection:text-white">
+
+  <div class="w-full max-w-md bg-dark-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6 relative overflow-hidden">
+    <!-- Glow effect -->
+    <div class="absolute -top-24 -left-24 w-48 h-48 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-violet-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
+    <!-- Header -->
+    <div class="text-center space-y-2 relative z-10">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 mx-auto flex items-center justify-center shadow-lg shadow-indigo-500/25 mb-4">
+        <i data-lucide="shield-check" class="w-7 h-7 text-white"></i>
+      </div>
+      <h1 class="text-2xl font-bold tracking-tight text-white flex items-center justify-center gap-2">
+        Amnezia<span class="text-indigo-400">WG</span>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">Panel</span>
+      </h1>
+      <p class="text-xs text-slate-400">Авторизуйтесь для доступа к панели управления</p>
+    </div>
+
+    <!-- Error alert -->
+    <div id="error-alert" class="hidden p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+      <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+      <span id="error-msg">Неверный логин или пароль</span>
+    </div>
+
+    <!-- Login Form -->
+    <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4 relative z-10">
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+          Логин
+        </label>
+        <div class="relative flex items-center">
+          <i data-lucide="user" class="w-4 h-4 text-slate-500 absolute left-3.5 pointer-events-none"></i>
+          <input type="text" id="username" required autofocus placeholder="admin"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition" />
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+          Пароль
+        </label>
+        <div class="relative flex items-center">
+          <i data-lucide="lock" class="w-4 h-4 text-slate-500 absolute left-3.5 pointer-events-none"></i>
+          <input type="password" id="password" required placeholder="••••••••"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition" />
+        </div>
+      </div>
+
+      <div class="pt-2">
+        <button type="submit" id="btn-submit"
+          class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/25 transition-all flex items-center justify-center gap-2">
+          <span>Войти в систему</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </form>
+
+    <div class="text-center pt-2">
+      <span class="text-[11px] text-slate-600">Защищено сквозным шифрованием</span>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const errBox = document.getElementById('error-alert');
+      const errMsg = document.getElementById('error-msg');
+      const btn = document.getElementById('btn-submit');
+      errBox.classList.add('hidden');
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      btn.disabled = true;
+      btn.innerHTML = `<span>Вход...</span>`;
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'Неверный логин или пароль');
+        }
+
+        // Success: redirect to dashboard
+        window.location.href = '/';
+      } catch (err) {
+        errMsg.innerText = err.message;
+        errBox.classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerHTML = `<span>Войти в систему</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>`;
+        lucide.createIcons();
+      }
+    }
+  </script>
+</body>
+</html>

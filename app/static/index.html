@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AmneziaWG All-in-One Manager</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #18181b; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- ================= AUTH VIEW ================= -->
+  <div id="authView" class="hidden min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-2xl backdrop-blur">
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-600/20 text-indigo-400 mb-4 ring-1 ring-indigo-500/30">
+          <i data-lucide="shield" class="w-8 h-8"></i>
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight text-white">AmneziaWG Panel</h1>
+        <p class="text-sm text-zinc-400 mt-1">Авторизуйтесь для управления VPN</p>
+      </div>
+
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Логин</label>
+          <div class="relative">
+            <i data-lucide="user" class="absolute left-3 top-3 w-5 h-5 text-zinc-500"></i>
+            <input type="text" id="loginUsername" required class="w-full pl-10 pr-4 py-2.5 bg-zinc-800/80 border border-zinc-700/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-white placeholder-zinc-500" placeholder="admin">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Пароль</label>
+          <div class="relative">
+            <i data-lucide="lock" class="absolute left-3 top-3 w-5 h-5 text-zinc-500"></i>
+            <input type="password" id="loginPassword" required class="w-full pl-10 pr-4 py-2.5 bg-zinc-800/80 border border-zinc-700/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-white placeholder-zinc-500" placeholder="••••••••">
+          </div>
+        </div>
+
+        <div id="loginError" class="hidden p-3 bg-red-950/50 border border-red-800/50 rounded-xl text-red-400 text-xs"></div>
+
+        <button type="submit" id="loginBtn" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium rounded-xl transition shadow-lg shadow-indigo-600/20 text-sm flex items-center justify-center gap-2">
+          <span>Войти</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MAIN APP VIEW ================= -->
+  <div id="appView" class="hidden min-h-screen flex flex-col">
+    <!-- Top Navigation -->
+    <header class="border-b border-zinc-800/80 bg-zinc-900/60 backdrop-blur sticky top-0 z-30">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center ring-1 ring-indigo-500/30">
+            <i data-lucide="shield-check" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h1 class="font-bold text-base text-white tracking-tight flex items-center gap-2">
+              AmneziaWG All-in-One
+              <span class="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">v2 / v3.1</span>
+            </h1>
+            <p class="text-xs text-zinc-400 flex items-center gap-1.5">
+              <span>Сервер:</span>
+              <span id="headerPublicIp" class="font-mono text-zinc-300">...</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button onclick="refreshData()" title="Обновить данные" class="p-2 text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg transition border border-zinc-700/50">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          </button>
+          <button onclick="logout()" class="flex items-center gap-2 text-xs font-medium text-zinc-400 hover:text-red-400 bg-zinc-800/80 hover:bg-red-500/10 px-3 py-2 rounded-lg transition border border-zinc-700/50">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Выйти</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <!-- Quick Metric Counters -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
+            <i data-lucide="network" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="text-xs text-zinc-400 font-medium">Интерфейсы</div>
+            <div id="statInterfaces" class="text-xl font-bold text-white">0</div>
+          </div>
+        </div>
+
+        <div class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
+            <i data-lucide="users" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="text-xs text-zinc-400 font-medium">Пользователи</div>
+            <div id="statUsers" class="text-xl font-bold text-white">0</div>
+          </div>
+        </div>
+
+        <div class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+            <i data-lucide="smartphone" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="text-xs text-zinc-400 font-medium">Устройства (В сети)</div>
+            <div id="statDevices" class="text-xl font-bold text-white">0 <span class="text-xs font-normal text-emerald-400">(0)</span></div>
+          </div>
+        </div>
+
+        <div class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+            <i data-lucide="activity" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="text-xs text-zinc-400 font-medium">Трафик (Rx / Tx)</div>
+            <div id="statTraffic" class="text-sm font-bold text-zinc-200 truncate">0 B / 0 B</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION: INTERFACES -->
+      <section class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="layers" class="w-5 h-5 text-indigo-400"></i>
+            <h2 class="text-lg font-bold text-white">Интерфейсы AmneziaWG</h2>
+          </div>
+        </div>
+
+        <div id="interfacesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Populated by JS -->
+          <div class="text-zinc-500 text-sm py-4">Загрузка интерфейсов...</div>
+        </div>
+      </section>
+
+      <!-- SECTION: USERS & CLIENT CONFIGS -->
+      <section class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="user-check" class="w-5 h-5 text-indigo-400"></i>
+            <h2 class="text-lg font-bold text-white">Пользователи и подсети</h2>
+          </div>
+          <button onclick="openCreateUserModal()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition shadow-md shadow-indigo-600/20 w-fit">
+            <i data-lucide="user-plus" class="w-4 h-4"></i>
+            <span>Создать пользователя</span>
+          </button>
+        </div>
+
+        <div id="usersContainer" class="space-y-4">
+          <!-- Populated by JS -->
+          <div class="text-zinc-500 text-sm py-4">Загрузка пользователей...</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- Create User Modal -->
+  <div id="modalCreateUser" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i data-lucide="user-plus" class="w-5 h-5 text-indigo-400"></i>
+          Новый пользователь
+        </h3>
+        <button onclick="closeModal('modalCreateUser')" class="text-zinc-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formCreateUser" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Интерфейс AWG</label>
+          <select id="newUserIface" required class="w-full px-3 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-white"></select>
+          <p class="text-xs text-zinc-500 mt-1">Пользователю будет автоматически выделена свободная подсеть вида <code>10.X.Y.0/24</code>.</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Имя пользователя (Логин)</label>
+          <input type="text" id="newUsername" required placeholder="Например: fitz, alex, office-1" class="w-full px-3 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-white">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Заметка (опционально)</label>
+          <input type="text" id="newUserNotes" placeholder="Контакты, отдел или комментарий" class="w-full px-3 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-white">
+        </div>
+
+        <div id="createUserError" class="hidden text-xs text-red-400 bg-red-950/40 p-3 rounded-xl border border-red-800/40"></div>
+
+        <div class="flex gap-3 justify-end pt-2">
+          <button type="button" onclick="closeModal('modalCreateUser')" class="px-4 py-2.5 text-zinc-400 hover:text-white text-sm">Отмена</button>
+          <button type="submit" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition shadow-md shadow-indigo-600/20">Создать</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Device / Config Modal -->
+  <div id="modalAddDevice" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i data-lucide="smartphone" class="w-5 h-5 text-indigo-400"></i>
+          Добавить устройство
+        </h3>
+        <button onclick="closeModal('modalAddDevice')" class="text-zinc-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formAddDevice" class="space-y-4">
+        <input type="hidden" id="addDeviceUserId">
+
+        <div class="bg-zinc-800/50 p-3 rounded-xl border border-zinc-800 text-xs text-zinc-400">
+          Пользователь: <span id="addDeviceUserName" class="text-white font-medium"></span><br>
+          Подсеть: <code id="addDeviceUserSubnet" class="text-indigo-400 font-mono"></code>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Ярлык устройства</label>
+          <input type="text" id="addDeviceLabel" required placeholder="Например: iPhone, Ноутбук, Роутер Keenetic" class="w-full px-3 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-white">
+        </div>
+
+        <div class="flex items-center gap-2">
+          <input type="checkbox" id="addDeviceUsePsk" checked class="w-4 h-4 rounded text-indigo-600 bg-zinc-800 border-zinc-700 focus:ring-indigo-500">
+          <label for="addDeviceUsePsk" class="text-xs text-zinc-300">Использовать дополнительный ключ PSK (PresharedKey)</label>
+        </div>
+
+        <div id="addDeviceError" class="hidden text-xs text-red-400 bg-red-950/40 p-3 rounded-xl border border-red-800/40"></div>
+
+        <div class="flex gap-3 justify-end pt-2">
+          <button type="button" onclick="closeModal('modalAddDevice')" class="px-4 py-2.5 text-zinc-400 hover:text-white text-sm">Отмена</button>
+          <button type="submit" id="btnSubmitAddDevice" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition shadow-md shadow-indigo-600/20 flex items-center gap-2">
+            <span>Выпустить конфиг</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- QR Code & Config Details Modal -->
+  <div id="modalQrView" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 id="qrModalTitle" class="text-lg font-bold text-white">Конфигурация AmneziaWG</h3>
+          <p id="qrModalSubtitle" class="text-xs text-zinc-400"></p>
+        </div>
+        <button onclick="closeModal('modalQrView')" class="text-zinc-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- QR Box -->
+      <div class="flex flex-col items-center justify-center p-4 bg-white rounded-xl shadow-inner mx-auto w-fit">
+        <img id="qrModalImage" src="" alt="QR Code" class="w-64 h-64 object-contain">
+      </div>
+      <p class="text-center text-xs text-zinc-400">Отсканируйте камерой в приложении <b>AmneziaWG</b> на смартфоне</p>
+
+      <!-- Action Buttons -->
+      <div class="flex gap-3 justify-center pt-2">
+        <a id="qrDownloadBtn" href="#" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition flex items-center gap-2 shadow-md shadow-indigo-600/20">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Скачать .conf файл</span>
+        </a>
+        <button onclick="copyConfText()" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-medium rounded-xl transition flex items-center gap-2 border border-zinc-700">
+          <i data-lucide="copy" class="w-4 h-4"></i>
+          <span id="copyBtnText">Скопировать текст</span>
+        </button>
+      </div>
+
+      <!-- Collapsible Conf Code -->
+      <details class="bg-zinc-950 rounded-xl border border-zinc-800/80 p-3 text-xs font-mono">
+        <summary class="cursor-pointer text-zinc-400 hover:text-zinc-200 select-none">Показать содержимое конфигурации</summary>
+        <pre id="qrModalConfText" class="mt-2 text-zinc-300 overflow-x-auto whitespace-pre p-2 bg-zinc-900 rounded-lg"></pre>
+      </details>
+    </div>
+  </div>
+
+  <!-- App Logic JS -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
