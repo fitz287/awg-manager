@@ -49,11 +49,6 @@
 curl -sSL https://raw.githubusercontent.com/fitz287/awg-manager/main/install.sh | bash
 ```
 
-*Либо с резервного зеркала:*
-```bash
-curl -sSL https://awg.fitz.su/install.sh | bash
-```
-
 Скрипт полностью **автономен** и автоматически:
 1. Проверит версию ОС (Ubuntu 20.04+, Debian 11+) и архитектуру.
 2. Установит необходимые пакеты (`python3`, `python3-venv`, `iptables`, `curl`, `qrencode`, репозиторий `ppa:amnezia/ppa` и `amneziawg-tools`).
