@@ -30,7 +30,7 @@ INSTALL_DIR="/opt/awg-manager"
 export PYTHONPATH="$INSTALL_DIR"
 CONFIG_DIR="/etc/amnezia/amneziawg"
 SYS_CONF="/etc/sysctl.d/99-awg.conf"
-PANEL_PORT="${PANEL_PORT:-8089}"
+PANEL_PORT="${PANEL_PORT:-8090}"
 PANEL_HOST="${PANEL_HOST:-0.0.0.0}"
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS="${ADMIN_PASS:-MGWnbc1yg7}"
@@ -120,10 +120,10 @@ EOF
 else
     echo -e "${YELLOW}[i] Проверка существующего $ENV_FILE...${NC}"
     CURRENT_PORT=$(grep "^PANEL_PORT=" "$ENV_FILE" | cut -d'=' -f2)
-    if [ "$CURRENT_PORT" = "8080" ] || [ -z "$CURRENT_PORT" ]; then
-        sed -i 's/^PANEL_PORT=.*/PANEL_PORT=8089/' "$ENV_FILE"
-        PANEL_PORT="8089"
-        echo -e "${GREEN}[✓] Порт изменен с 8080 на 8089 в $ENV_FILE${NC}"
+    if [ "$CURRENT_PORT" = "8080" ] || [ "$CURRENT_PORT" = "8089" ] || [ -z "$CURRENT_PORT" ]; then
+        sed -i 's/^PANEL_PORT=.*/PANEL_PORT=8090/' "$ENV_FILE"
+        PANEL_PORT="8090"
+        echo -e "${GREEN}[✓] Порт переведен на 8090 в $ENV_FILE${NC}"
     else
         PANEL_PORT="$CURRENT_PORT"
         echo -e "${GREEN}[✓] Используется порт $PANEL_PORT из $ENV_FILE${NC}"
@@ -236,7 +236,7 @@ print('Учетные данные администратора успешно �
         echo -e "${GREEN}[✓] Порт изменен на $new_port. Служба перезапущена.${NC}"
         ;;
     info)
-        PORT=$(grep "^PANEL_PORT=" /opt/awg-manager/.env 2>/dev/null | cut -d'=' -f2 || echo "8089")
+        PORT=$(grep "^PANEL_PORT=" /opt/awg-manager/.env 2>/dev/null | cut -d'=' -f2 || echo "8090")
         IP=$(curl -s --max-time 3 https://api.ipify.org || hostname -I | awk '{print $1}')
         ADMIN_U=$(PYTHONPATH=/opt/awg-manager /opt/awg-manager/venv/bin/python3 -c "from app.database import get_setting; print(get_setting('admin_username', 'admin'))" 2>/dev/null || echo "admin")
         echo -e "${CYAN}====================================================${NC}"
