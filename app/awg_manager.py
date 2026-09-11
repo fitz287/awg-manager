@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import shutil
@@ -290,6 +291,9 @@ def generate_amnezia_vpn_data(peer_id: int) -> Tuple[Dict[str, Any], str]:
     for k in ["Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4", "I1", "I2", "I3", "HeaderProtectionKey"]:
         if k in params and params[k] is not None:
             awg_container_data[k] = str(params[k])
+
+    client_conf_text = generate_client_config_text(peer_id)
+    awg_container_data["last_config"] = json.dumps({"config": client_conf_text})
 
     container_type = "amnezia-awg"
     vpn_payload = {

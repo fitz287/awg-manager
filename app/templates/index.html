@@ -2815,6 +2815,9 @@
                 <button onclick="copyUserSubLink('${escapeHtml(u.subscription_token || '')}')" title="Скопировать ссылку подписки" class="p-2 sm:p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-indigo-600/20 rounded-xl transition active:scale-95">
                   <i data-lucide="link" class="w-4 h-4"></i>
                 </button>
+                <button onclick="resetUserSubTokenConfirm(${u.id}, '${escapeHtml(u.username)}')" title="Перегенерировать токен подписки (аннулировать старый)" class="p-2 sm:p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-600/20 rounded-xl transition active:scale-95">
+                  <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                </button>
                 <a href="/api/users/${u.id}/export-zip" title="Скачать все конфиги (ZIP)" class="p-2 sm:p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-indigo-600/20 rounded-xl transition active:scale-95 inline-flex items-center justify-center">
                   <i data-lucide="file-archive" class="w-4 h-4"></i>
                 </a>
@@ -3346,6 +3349,19 @@
       }).catch(() => {
         prompt('Ссылка подписки:', fullUrl);
       });
+    }
+
+    async function resetUserSubTokenConfirm(userId, username) {
+      if (!confirm(`Сбросить ссылку подписки для пользователя ${username}?\nПредыдущая ссылка сразу перестанет действовать, и будет сгенерирован новый случайный токен.`)) return;
+      try {
+        const res = await fetch(`/api/users/${userId}/reset-sub-token`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка сброса токена');
+        showToast('Ссылка подписки обновлена! Старая ссылка аннулирована.', 'success');
+        await loadUsers();
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
     }
 
     function openEditUserModal(id, username, notes, tgId) {

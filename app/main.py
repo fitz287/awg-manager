@@ -82,6 +82,7 @@ from app.database import (
     get_users_by_connection,
     get_user_by_sub_token,
     get_user_by_telegram_id,
+    regenerate_user_sub_token,
     init_db,
     set_setting,
     toggle_peer,
@@ -1472,9 +1473,14 @@ async def serve_subscription(token: str, request: Request, format: Optional[str]
                 "peers": peers,
                 "sub_url": sub_url,
             },
+            headers={
+                "X-Robots-Tag": "noindex, nofollow, noarchive, nosnippet",
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0, private",
+                "Pragma": "no-cache",
+            },
         )
 
-    if format == "sing-box" or "sing-box" in user_agent:
+    if format == "sing-box" or "sing-box" in user_agent or "awg-manager" in user_agent:
         outbounds = []
         for p in peers:
             try:
@@ -1611,6 +1617,21 @@ async def serve_sub_zip(token: str):
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
+
+
+@app.post("/api/users/{user_id}/reset-sub-token")
+async def api_reset_user_sub_token(user_id: int, request: Request):
+    require_admin(request)
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    new_token = regenerate_user_sub_token(user_id)
+    return {"status": "success", "new_token": new_token, "message": "Ссылка подписки успешно обновлена"}
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+async def serve_robots_txt():
+    return "User-agent: *\nDisallow: /sub/\nDisallow: /api/\n"
 
 
 @app.get("/api/system/status")

@@ -698,6 +698,13 @@ def get_user_by_sub_token(token: str) -> Optional[Dict[str, Any]]:
         return dict(row) if row else None
 
 
+def regenerate_user_sub_token(user_id: int) -> str:
+    new_token = secrets.token_urlsafe(16)
+    with get_db() as conn:
+        conn.execute("UPDATE users SET subscription_token = ? WHERE id = ?", (new_token, user_id))
+    return new_token
+
+
 def update_user_password(user_id: int, password_hash: str) -> None:
     with get_db() as conn:
         conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
