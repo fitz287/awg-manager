@@ -297,11 +297,18 @@ def start_connection(conn_id: int) -> Tuple[bool, str]:
     write_server_config(conn_id)
 
     if IS_LINUX:
-        check_ok, _ = run_system_cmd(["ip", "link", "show", name])
-        if check_ok:
+        # If systemd service is actively running, no action needed
+        srv_ok, _ = run_system_cmd(["systemctl", "is-active", f"awg-quick@{name}"])
+        if srv_ok:
             update_connection_status(conn_id, True)
             return True, f"Интерфейс {name} уже запущен"
 
+        # If kernel device was left orphaned, delete it to ensure clean setup
+        check_ok, _ = run_system_cmd(["ip", "link", "show", name])
+        if check_ok:
+            run_system_cmd(["ip", "link", "delete", "dev", name])
+
+        run_system_cmd(["systemctl", "reset-failed", f"awg-quick@{name}"])
         ok, out = run_system_cmd(["systemctl", "start", f"awg-quick@{name}"])
         if not ok:
             ok, out = run_system_cmd(["awg-quick", "up", name])
@@ -317,7 +324,7 @@ def start_connection(conn_id: int) -> Tuple[bool, str]:
 
 
 def stop_connection(conn_id: int) -> Tuple[bool, str]:
-    """Stops the AmneziaWG interface."""
+    """Stops the AmneziaWG interface and ensures the kernel device is removed."""
     conn = get_connection_by_id(conn_id)
     if not conn:
         return False, "Подключение не найдено"
@@ -333,19 +340,23 @@ def stop_connection(conn_id: int) -> Tuple[bool, str]:
             return True, f"Интерфейс {name} остановлен на ноде {server['name']}"
 
     if IS_LINUX:
-        ok, out = run_system_cmd(["systemctl", "stop", f"awg-quick@{name}"])
-        if not ok:
-            ok, out = run_system_cmd(["awg-quick", "down", name])
+        run_system_cmd(["systemctl", "stop", f"awg-quick@{name}"])
+        run_system_cmd(["awg-quick", "down", name])
+        # Guarantee kernel network link is deleted
+        check_ok, _ = run_system_cmd(["ip", "link", "show", name])
+        if check_ok:
+            run_system_cmd(["ip", "link", "delete", "dev", name])
+        run_system_cmd(["systemctl", "reset-failed", f"awg-quick@{name}"])
 
         update_connection_status(conn_id, False)
-        return True, f"Интерфейс {name} остановлен: {out}"
+        return True, f"Интерфейс {name} остановлен"
     else:
         update_connection_status(conn_id, False)
         return True, f"[MOCK] Интерфейс {name} остановлен"
 
 
 def restart_connection(conn_id: int) -> Tuple[bool, str]:
-    """Restarts the connection, writing fresh config and applying changes."""
+    """Restarts the connection, writing fresh config and cleanly reloading kernel device."""
     conn = get_connection_by_id(conn_id)
     if not conn:
         return False, "Подключение не найдено"
@@ -360,27 +371,29 @@ def restart_connection(conn_id: int) -> Tuple[bool, str]:
     # Local server
     write_server_config(conn_id)
     if IS_LINUX:
-        ok, out = run_system_cmd(["systemctl", "restart", f"awg-quick@{name}"])
-        if not ok:
-            stop_connection(conn_id)
-            ok, out = run_system_cmd(["awg-quick", "up", name])
-
-        if ok:
-            update_connection_status(conn_id, True)
-            return True, f"Интерфейс {name} успешно перезапущен"
-        else:
-            return False, f"Ошибка перезапуска {name}: {out}"
+        stop_connection(conn_id)
+        import time
+        time.sleep(0.3)
+        return start_connection(conn_id)
     else:
         update_connection_status(conn_id, True)
         return True, f"[MOCK] Интерфейс {name} перезапущен"
 
 
 def remove_connection_files(name: str, server_id: Optional[int] = None) -> None:
-    """Removes the interface directory and symlink."""
+    """Removes the interface directory, symlink, and downs kernel device."""
     if server_id:
         server = get_server_by_id(server_id)
         if server:
             NodeClient(server).delete_interface(name)
+
+    if IS_LINUX:
+        run_system_cmd(["systemctl", "stop", f"awg-quick@{name}"])
+        run_system_cmd(["awg-quick", "down", name])
+        check_ok, _ = run_system_cmd(["ip", "link", "show", name])
+        if check_ok:
+            run_system_cmd(["ip", "link", "delete", "dev", name])
+        run_system_cmd(["systemctl", "reset-failed", f"awg-quick@{name}"])
 
     dir_path = get_interface_dir(name)
     symlink_path = get_interface_symlink(name)
