@@ -235,6 +235,7 @@ class CreatePeerRequest(BaseModel):
 
 class UpdateSettingsRequest(BaseModel):
     server_host: Optional[str] = None
+    panel_url: Optional[str] = None
     default_dns: str
     default_mtu: int
     tg_bot_token: Optional[str] = None
@@ -1267,6 +1268,7 @@ async def api_my_change_password(req: UserChangeOwnPasswordRequest, request: Req
 async def api_get_settings(request: Request):
     require_admin(request)
     host = detect_public_ip()
+    panel_url = get_setting("panel_url", "https://awg.fitz.su")
     dns = get_setting("default_dns", DEFAULT_DNS)
     mtu = int(get_setting("default_mtu", str(DEFAULT_MTU)))
     tg_token = get_setting("tg_bot_token", "")
@@ -1274,6 +1276,7 @@ async def api_get_settings(request: Request):
     tg_proxy = get_setting("tg_bot_proxy", "http://127.0.0.1:1080")
     return {
         "server_host": host,
+        "panel_url": panel_url,
         "default_dns": dns,
         "default_mtu": mtu,
         "tg_bot_token": tg_token,
@@ -1289,6 +1292,11 @@ async def api_update_settings(req: UpdateSettingsRequest, request: Request):
     require_admin(request)
     if req.server_host is not None:
         set_setting("server_host", req.server_host.strip())
+    if req.panel_url is not None:
+        p_url = req.panel_url.strip()
+        if p_url and not p_url.startswith("http://") and not p_url.startswith("https://"):
+            p_url = f"https://{p_url}"
+        set_setting("panel_url", p_url.rstrip("/") if p_url else "https://awg.fitz.su")
     set_setting("default_dns", req.default_dns.strip())
     set_setting("default_mtu", str(req.default_mtu))
     if req.tg_bot_token is not None:

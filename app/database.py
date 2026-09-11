@@ -156,6 +156,7 @@ def init_db():
         cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('default_dns', ?)", (DEFAULT_DNS,))
         cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('default_mtu', ?)", (str(DEFAULT_MTU),))
         cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('server_host', '')")
+        cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('panel_url', 'https://awg.fitz.su')")
         cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('tg_bot_token', '')")
         cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('tg_bot_enabled', '0')")
 

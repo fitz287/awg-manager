@@ -57,11 +57,11 @@ dp = Dispatcher()
 
 def get_panel_domain() -> str:
     """Returns external panel domain or default."""
-    host = get_setting("server_host", "").strip()
-    if host and ("." in host or "localhost" in host):
-        if not host.startswith("http"):
-            host = f"https://{host}"
-        return host.rstrip("/")
+    url = get_setting("panel_url", "").strip()
+    if url:
+        if not url.startswith("http://") and not url.startswith("https://"):
+            url = f"https://{url}"
+        return url.rstrip("/")
     return "https://awg.fitz.su"
 
 
@@ -385,10 +385,16 @@ async def cb_send_sub(call: CallbackQuery):
     text = (
         "🔗 <b>Ваша персональная ссылка подписки:</b>\n\n"
         f"<code>{sub_url}</code>\n\n"
-        "• <b>В браузере (телефон/ПК):</b> откройте ссылку, чтобы увидеть личный кабинет со всеми вашими серверами, кнопками скачивания и QR-кодами.\n"
-        "• <b>В клиентах с поддержкой подписок (Karing, Sing-box, NekoBox):</b> вставьте эту ссылку в раздел «Подписки» для автоматического получения всех профилей."
+        "• <b>В браузере (телефон/ПК):</b> откройте личный кабинет по ссылке или кнопке ниже, чтобы получить конфигурации для всех ваших серверов, QR-коды и ссылки быстрого импорта.\n"
+        "• <b>В клиентах с поддержкой подписок (Karing, NekoBox):</b> скопируйте эту ссылку в раздел «Подписки» приложения."
     )
-    await call.message.answer(text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🌐 Открыть личный кабинет", url=sub_url)],
+            [InlineKeyboardButton(text="⬅️ Главное меню", callback_data="act:menu")],
+        ]
+    )
+    await call.message.answer(text, reply_markup=kb, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
     await call.answer()
 
 

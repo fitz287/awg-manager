@@ -247,6 +247,14 @@
               </div>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                  <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                    Внешний адрес / Домен панели (для бота и ссылок)
+                  </label>
+                  <input type="text" id="setting-panel-url" value="https://awg.fitz.su" placeholder="https://awg.fitz.su" required
+                    class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono" />
+                  <p class="text-xs text-slate-500 mt-1">Используется для формирования защищённых HTTPS ссылок подписки в Telegram-боте (например, <code>https://awg.fitz.su</code>).</p>
+                </div>
                 <div>
                   <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
                     DNS серверы по умолчанию
@@ -3206,6 +3214,9 @@
         if (!res.ok) return;
         const data = await res.json();
 
+        if (document.getElementById('setting-panel-url')) {
+          document.getElementById('setting-panel-url').value = data.panel_url || 'https://awg.fitz.su';
+        }
         document.getElementById('setting-default-dns').value = data.default_dns || '1.1.1.1, 8.8.8.8';
         document.getElementById('setting-default-mtu').value = data.default_mtu || 1200;
         if (document.getElementById('setting-tg-bot-token')) {
@@ -3247,6 +3258,7 @@
     async function saveSettings(e) {
       e.preventDefault();
       const payload = {
+        panel_url: document.getElementById('setting-panel-url') ? document.getElementById('setting-panel-url').value.trim() : undefined,
         default_dns: document.getElementById('setting-default-dns').value.trim(),
         default_mtu: parseInt(document.getElementById('setting-default-mtu').value),
         tg_bot_token: document.getElementById('setting-tg-bot-token') ? document.getElementById('setting-tg-bot-token').value.trim() : undefined,
