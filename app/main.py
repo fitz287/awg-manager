@@ -1038,6 +1038,23 @@ async def api_download_peer_vpn(peer_id: int, request: Request):
     )
 
 
+@app.get("/api/peers/{peer_id}/vpn-url")
+async def api_get_peer_vpn_url(peer_id: int, request: Request):
+    auth = get_current_auth(request)
+    if not auth:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+
+    peer = get_peer_by_id(peer_id)
+    if not peer:
+        raise HTTPException(status_code=404, detail="Конфигурация устройства не найдена")
+
+    if auth.get("role") != "admin" and auth.get("user_id") != peer["user_id"]:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+
+    _, vpn_url = generate_amnezia_vpn_data(peer_id)
+    return {"status": "ok", "vpn_url": vpn_url}
+
+
 
 @app.post("/api/peers/{peer_id}/toggle")
 async def api_toggle_peer(peer_id: int, request: Request):
@@ -1441,6 +1458,12 @@ async def serve_subscription(token: str, request: Request, format: Optional[str]
     is_browser = "text/html" in accept_header and not format
     if is_browser:
         sub_url = str(request.url).split("?")[0]
+        for p in peers:
+            try:
+                _, vpn_url = generate_amnezia_vpn_data(p["id"])
+                p["vpn_url"] = vpn_url
+            except Exception:
+                p["vpn_url"] = ""
         return templates.TemplateResponse(
             request=request,
             name="sub_portal.html",

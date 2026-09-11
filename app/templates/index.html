@@ -1344,6 +1344,10 @@
             <i data-lucide="copy" class="w-4 h-4"></i>
             <span>Скопировать текст</span>
           </button>
+          <button id="btn-copy-vpn-key" onclick="copyModalVpnKey()" class="flex-1 py-2.5 px-4 bg-purple-600/80 hover:bg-purple-600 active:bg-purple-700 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition shadow">
+            <i data-lucide="key" class="w-4 h-4"></i>
+            <span>Копировать vpn://</span>
+          </button>
         </div>
 
         <div class="w-full pt-1">
@@ -1394,6 +1398,7 @@
     let currentProtocol = '1.0';
     let qrcodeObj = null;
     let activeModalConfigText = '';
+    let activeModalPeerId = null;
 
     function escapeHtml(str) {
       if (str === null || str === undefined) return '';
@@ -2867,6 +2872,9 @@
                             <a href="/api/peers/${p.id}/vpn" title="Скачать Amnezia .vpn" class="p-1.5 bg-slate-800 hover:bg-purple-600 text-purple-300 hover:text-white rounded-lg transition inline-flex items-center justify-center active:scale-95">
                               <i data-lucide="shield" class="w-3.5 h-3.5"></i>
                             </a>
+                            <button onclick="copyPeerVpnKey(${p.id})" title="Скопировать vpn:// ключ (для роутеров и Amnezia)" class="p-1.5 bg-slate-800 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded-lg transition active:scale-95">
+                              <i data-lucide="key" class="w-3.5 h-3.5"></i>
+                            </button>
                             <button onclick="deletePeerConfirm(${p.id}, '${escapeHtml(p.label)}')" title="Удалить" class="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition active:scale-95">
                               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                             </button>
@@ -2899,18 +2907,22 @@
                       </button>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-2 pt-1 border-t border-slate-800/60">
-                      <button onclick="showQrModal(${p.id}, '${escapeHtml(u.username)}', '${escapeHtml(p.label)}')" class="py-2 px-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 font-medium text-xs rounded-lg flex items-center justify-center gap-1.5 transition active:scale-95">
+                    <div class="grid grid-cols-4 gap-1.5 pt-1 border-t border-slate-800/60">
+                      <button onclick="showQrModal(${p.id}, '${escapeHtml(u.username)}', '${escapeHtml(p.label)}')" class="py-2 px-1 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 font-medium text-[11px] rounded-lg flex items-center justify-center gap-1 transition active:scale-95">
                         <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
                         <span>QR</span>
                       </button>
-                      <a href="/api/peers/${p.id}/download" class="py-2 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs rounded-lg flex items-center justify-center gap-1.5 transition active:scale-95">
+                      <a href="/api/peers/${p.id}/download" class="py-2 px-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-[11px] rounded-lg flex items-center justify-center gap-1 transition active:scale-95">
                         <i data-lucide="download" class="w-3.5 h-3.5"></i>
                         <span>.conf</span>
                       </a>
-                      <button onclick="deletePeerConfirm(${p.id}, '${escapeHtml(p.label)}')" class="py-2 px-2 bg-slate-800/60 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 font-medium text-xs rounded-lg flex items-center justify-center gap-1.5 transition active:scale-95">
+                      <button onclick="copyPeerVpnKey(${p.id})" class="py-2 px-1 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 font-medium text-[11px] rounded-lg flex items-center justify-center gap-1 transition active:scale-95" title="vpn://">
+                        <i data-lucide="key" class="w-3.5 h-3.5"></i>
+                        <span>vpn://</span>
+                      </button>
+                      <button onclick="deletePeerConfirm(${p.id}, '${escapeHtml(p.label)}')" class="py-2 px-1 bg-slate-800/60 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 font-medium text-[11px] rounded-lg flex items-center justify-center gap-1 transition active:scale-95">
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                        <span>Удалить</span>
+                        <span>Удал</span>
                       </button>
                     </div>
                   </div>
@@ -3130,6 +3142,7 @@
         const text = await res.text();
 
         activeModalConfigText = text;
+        activeModalPeerId = peerId;
         document.getElementById('qr-title').innerText = label || 'Конфигурация';
         document.getElementById('qr-config-text').value = text;
         document.getElementById('btn-download-conf').onclick = () => {
@@ -3161,6 +3174,24 @@
       }).catch(() => {
         showToast('Не удалось скопировать', 'error');
       });
+    }
+
+    async function copyModalVpnKey() {
+      if (!activeModalPeerId) return;
+      await copyPeerVpnKey(activeModalPeerId);
+    }
+
+    async function copyPeerVpnKey(peerId) {
+      try {
+        const res = await fetch(`/api/peers/${peerId}/vpn-url`);
+        if (!res.ok) throw new Error('Не удалось получить ключ');
+        const data = await res.json();
+        if (!data.vpn_url) throw new Error('Ключ vpn:// пуст');
+        await navigator.clipboard.writeText(data.vpn_url);
+        showToast('Ключ vpn:// скопирован в буфер обмена!', 'success');
+      } catch (err) {
+        showToast('Ошибка: ' + err.message, 'error');
+      }
     }
 
     // ==============================================================

@@ -107,9 +107,12 @@
             <button onclick="showQrModal({{ peer.id }}, '{{ peer.server_name }} ({{ peer.connection_name }})')" class="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-medium py-2 px-3 rounded-xl border border-gray-700 transition flex items-center justify-center gap-1.5">
               <i class="fa-solid fa-qrcode"></i> QR-код
             </button>
-            <a href="/api/peers/{{ peer.id }}/vpn" download class="bg-purple-600/80 hover:bg-purple-600 text-white text-xs font-medium py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 col-span-2">
-              <i class="fa-solid fa-shield-cat"></i> Скачать Amnezia .vpn
+            <a href="/api/peers/{{ peer.id }}/vpn" download class="bg-purple-600/80 hover:bg-purple-600 text-white text-xs font-medium py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-file-arrow-down"></i> Amnezia .vpn
             </a>
+            <button onclick="copyVpnUrl('{{ peer.vpn_url }}', this)" class="bg-indigo-600/90 hover:bg-indigo-500 text-white text-xs font-medium py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-key"></i> <span>Копировать vpn://</span>
+            </button>
           </div>
         </div>
         {% endfor %}
@@ -121,14 +124,18 @@
       <h3 class="font-semibold text-sm text-gray-200 flex items-center gap-2">
         <i class="fa-solid fa-circle-info text-blue-400"></i> Инструкция по подключению
       </h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
         <div class="space-y-1">
           <p class="font-medium text-gray-300">1. Официальный AmneziaWG:</p>
-          <p>Скачайте приложение <b>AmneziaWG</b>, нажмите «+» и выберите «Импорт из файла» (скачанный <code>.conf</code>) или отсканируйте <b>QR-код</b> с экрана.</p>
+          <p>Скачайте <b>AmneziaWG</b>, нажмите «+» и выберите «Импорт из файла» (<code>.conf</code>) или отсканируйте <b>QR-код</b> с экрана.</p>
         </div>
         <div class="space-y-1">
           <p class="font-medium text-gray-300">2. Клиент Amnezia VPN:</p>
-          <p>Скачайте <b>Amnezia VPN</b>, выберите «Добавить подключение» &rarr; «Открыть файл с настройками» и выберите <code>.vpn</code> файл.</p>
+          <p>В приложении <b>Amnezia VPN</b> выберите «Добавить» &rarr; «Открыть файл» (<code>.vpn</code>) либо вставьте скопированную строку <code>vpn://...</code>.</p>
+        </div>
+        <div class="space-y-1">
+          <p class="font-medium text-gray-300">3. Роутеры (Keenetic, OpenWrt):</p>
+          <p>Нажмите <b>«Копировать vpn://»</b> и вставьте строку в поле <i>«Вставить ссылку»</i> роутера, либо скачайте <code>.conf</code> и загрузите через <i>«Загрузить файл»</i>.</p>
         </div>
       </div>
     </section>
@@ -163,6 +170,24 @@
         btn.innerHTML = orig;
         btn.classList.replace('bg-emerald-600', 'bg-indigo-600');
       }, 2000);
+    }
+
+    function copyVpnUrl(vpnUrl, btn) {
+      if (!vpnUrl) {
+        alert('Ключ vpn:// для этого подключения ещё не сформирован');
+        return;
+      }
+      navigator.clipboard.writeText(vpnUrl).then(() => {
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check text-emerald-300"></i> <span>Скопировано!</span>';
+        btn.classList.replace('bg-indigo-600/90', 'bg-emerald-600');
+        setTimeout(() => {
+          btn.innerHTML = orig;
+          btn.classList.replace('bg-emerald-600', 'bg-indigo-600/90');
+        }, 2000);
+      }).catch(() => {
+        prompt('Скопируйте ключ vpn:// вручную:', vpnUrl);
+      });
     }
 
     let qrInstance = null;
