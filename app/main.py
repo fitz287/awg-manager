@@ -220,7 +220,7 @@ class CreatePeerRequest(BaseModel):
 
 
 class UpdateSettingsRequest(BaseModel):
-    server_host: str
+    server_host: Optional[str] = None
     default_dns: str
     default_mtu: int
 
@@ -1130,7 +1130,8 @@ async def api_get_settings(request: Request):
 @app.post("/api/settings")
 async def api_update_settings(req: UpdateSettingsRequest, request: Request):
     require_admin(request)
-    set_setting("server_host", req.server_host.strip())
+    if req.server_host is not None:
+        set_setting("server_host", req.server_host.strip())
     set_setting("default_dns", req.default_dns.strip())
     set_setting("default_mtu", str(req.default_mtu))
     return {"status": "success", "message": "Настройки сохранены"}

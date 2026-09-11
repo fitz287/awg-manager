@@ -233,19 +233,11 @@
             </h2>
 
             <form id="settings-form" onsubmit="saveSettings(event)" class="space-y-4">
-              <div>
-                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
-                  Внешний IP / Домен сервера (Endpoint для клиентов)
-                </label>
-                <div class="flex flex-col sm:flex-row gap-2">
-                  <input type="text" id="setting-server-host" required placeholder="например, 194.87.12.34 или vpn.domain.com"
-                    class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono" />
-                  <button type="button" onclick="autoDetectIp()" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-xl border border-slate-700 text-slate-200 flex items-center justify-center gap-1.5 shrink-0 transition">
-                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                    Определить IP
-                  </button>
+              <div class="p-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl flex items-start gap-3 text-xs text-slate-400">
+                <i data-lucide="info" class="w-4 h-4 text-indigo-400 shrink-0 mt-0.5"></i>
+                <div>
+                  <span class="font-semibold text-slate-300">Адреса серверов (Endpoint):</span> В мультинодовой архитектуре внешний IP / домен настраивается индивидуально для каждого сервера во вкладке <a href="javascript:void(0)" onclick="switchTab('servers')" class="text-indigo-400 hover:underline">«Серверы»</a>. Клиентские конфиги автоматически получают правильный адрес нужной ноды.
                 </div>
-                <p class="text-xs text-slate-500 mt-1">Этот адрес подставляется в сгенерированные клиентские файлы конфигурации и QR-коды.</p>
               </div>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -3014,7 +3006,6 @@
         if (!res.ok) return;
         const data = await res.json();
 
-        document.getElementById('setting-server-host').value = data.server_host || '';
         document.getElementById('setting-default-dns').value = data.default_dns || '1.1.1.1, 8.8.8.8';
         document.getElementById('setting-default-mtu').value = data.default_mtu || 1200;
 
@@ -3024,24 +3015,9 @@
       }
     }
 
-    async function autoDetectIp() {
-      try {
-        showToast('Определяем внешний IP...', 'info');
-        const res = await fetch('https://api.ipify.org?format=json');
-        const data = await res.json();
-        if (data.ip) {
-          document.getElementById('setting-server-host').value = data.ip;
-          showToast(`IP определен: ${data.ip}`, 'success');
-        }
-      } catch (err) {
-        showToast('Не удалось автоматически определить IP', 'error');
-      }
-    }
-
     async function saveSettings(e) {
       e.preventDefault();
       const payload = {
-        server_host: document.getElementById('setting-server-host').value.trim(),
         default_dns: document.getElementById('setting-default-dns').value.trim(),
         default_mtu: parseInt(document.getElementById('setting-default-mtu').value),
       };
