@@ -19,6 +19,7 @@ import zipfile
 from typing import Optional
 
 from aiogram import Bot, Dispatcher, F, types
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart
 from aiogram.types import (
@@ -398,20 +399,31 @@ async def main():
     while True:
         token = get_setting("tg_bot_token", "").strip() or os.getenv("TG_BOT_TOKEN", "").strip()
         enabled = get_setting("tg_bot_enabled", "0").strip()
+        proxy = get_setting("tg_bot_proxy", "http://127.0.0.1:1080").strip() or os.getenv("TG_BOT_PROXY", "").strip()
 
         if not token or enabled != "1":
             logger.info("Telegram bot is disabled or token is not configured. Checking again in 15 seconds...")
             await asyncio.sleep(15)
             continue
 
-        logger.info("Starting Telegram bot polling with configured token...")
+        if proxy and not (proxy.startswith("http://") or proxy.startswith("https://") or proxy.startswith("socks5://") or proxy.startswith("socks5h://")):
+            proxy = f"http://{proxy}"
+
+        logger.info("Starting Telegram bot polling with configured token (proxy: %s)...", proxy or "Direct")
+        bot = None
         try:
-            bot = Bot(token=token)
+            session = AiohttpSession(proxy=proxy) if proxy else None
+            bot = Bot(token=token, session=session)
             me = await bot.get_me()
-            logger.info("Bot successfully authenticated as @%s (%s)", me.username, me.id)
+            logger.info("Bot successfully authenticated as @%s (%s) via %s", me.username, me.id, proxy or "Direct")
             await dp.start_polling(bot)
         except Exception as e:
             logger.error("Bot encountered error during polling: %s. Re-checking in 15 seconds...", e)
+            if bot and bot.session:
+                try:
+                    await bot.session.close()
+                except Exception:
+                    pass
             await asyncio.sleep(15)
 
 

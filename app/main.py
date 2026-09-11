@@ -238,6 +238,7 @@ class UpdateSettingsRequest(BaseModel):
     default_mtu: int
     tg_bot_token: Optional[str] = None
     tg_bot_enabled: Optional[str] = None
+    tg_bot_proxy: Optional[str] = None
 
 
 
@@ -1252,12 +1253,14 @@ async def api_get_settings(request: Request):
     mtu = int(get_setting("default_mtu", str(DEFAULT_MTU)))
     tg_token = get_setting("tg_bot_token", "")
     tg_enabled = get_setting("tg_bot_enabled", "0")
+    tg_proxy = get_setting("tg_bot_proxy", "http://127.0.0.1:1080")
     return {
         "server_host": host,
         "default_dns": dns,
         "default_mtu": mtu,
         "tg_bot_token": tg_token,
         "tg_bot_enabled": tg_enabled,
+        "tg_bot_proxy": tg_proxy,
         "is_linux": IS_LINUX,
         "os_info": f"{platform.system()} {platform.release()}",
     }
@@ -1272,6 +1275,8 @@ async def api_update_settings(req: UpdateSettingsRequest, request: Request):
     set_setting("default_mtu", str(req.default_mtu))
     if req.tg_bot_token is not None:
         set_setting("tg_bot_token", req.tg_bot_token.strip())
+    if req.tg_bot_proxy is not None:
+        set_setting("tg_bot_proxy", req.tg_bot_proxy.strip())
     if req.tg_bot_enabled is not None:
         set_setting("tg_bot_enabled", req.tg_bot_enabled.strip())
         if IS_LINUX:
@@ -1320,9 +1325,13 @@ async def api_bot_test(request: Request):
     if not token:
         raise HTTPException(status_code=400, detail="Токен Telegram-бота не задан")
 
+    proxy = body.get("proxy", "").strip() or get_setting("tg_bot_proxy", "http://127.0.0.1:1080").strip()
+    if proxy and not (proxy.startswith("http://") or proxy.startswith("https://") or proxy.startswith("socks5://") or proxy.startswith("socks5h://")):
+        proxy = f"http://{proxy}"
+
     try:
         import httpx
-        async with httpx.AsyncClient(timeout=8.0) as client:
+        async with httpx.AsyncClient(proxy=proxy if proxy else None, timeout=10.0) as client:
             res = await client.get(f"https://api.telegram.org/bot{token}/getMe")
             data = res.json()
             if data.get("ok"):

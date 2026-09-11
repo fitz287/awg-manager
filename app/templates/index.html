@@ -301,6 +301,15 @@
                   <p id="bot-test-result" class="text-xs mt-1.5 hidden"></p>
                 </div>
 
+                <div>
+                  <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                    Прокси для бота (HTTP / SOCKS5)
+                  </label>
+                  <input type="text" id="setting-tg-bot-proxy" placeholder="http://127.0.0.1:1080"
+                    class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono" />
+                  <p class="text-[11px] text-slate-500 mt-1">Оставьте <code>http://127.0.0.1:1080</code> для обхода блокировок Telegram API через локальный прокси.</p>
+                </div>
+
                 <div class="flex items-center gap-3 pt-1">
                   <label class="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" id="setting-tg-bot-enabled" class="sr-only peer">
@@ -3168,6 +3177,9 @@
         if (document.getElementById('setting-tg-bot-token')) {
           document.getElementById('setting-tg-bot-token').value = data.tg_bot_token || '';
         }
+        if (document.getElementById('setting-tg-bot-proxy')) {
+          document.getElementById('setting-tg-bot-proxy').value = data.tg_bot_proxy || 'http://127.0.0.1:1080';
+        }
         if (document.getElementById('setting-tg-bot-enabled')) {
           document.getElementById('setting-tg-bot-enabled').checked = (data.tg_bot_enabled === '1');
         }
@@ -3204,6 +3216,7 @@
         default_dns: document.getElementById('setting-default-dns').value.trim(),
         default_mtu: parseInt(document.getElementById('setting-default-mtu').value),
         tg_bot_token: document.getElementById('setting-tg-bot-token') ? document.getElementById('setting-tg-bot-token').value.trim() : undefined,
+        tg_bot_proxy: document.getElementById('setting-tg-bot-proxy') ? document.getElementById('setting-tg-bot-proxy').value.trim() : undefined,
         tg_bot_enabled: document.getElementById('setting-tg-bot-enabled') ? (document.getElementById('setting-tg-bot-enabled').checked ? '1' : '0') : undefined,
       };
 
@@ -3344,6 +3357,7 @@
 
     async function testBotToken() {
       const token = document.getElementById('setting-tg-bot-token').value.trim();
+      const proxy = document.getElementById('setting-tg-bot-proxy') ? document.getElementById('setting-tg-bot-proxy').value.trim() : '';
       const resEl = document.getElementById('bot-test-result');
       resEl.classList.remove('hidden', 'text-emerald-400', 'text-rose-400');
       resEl.textContent = 'Проверка подключения к Telegram API...';
@@ -3352,7 +3366,7 @@
         const res = await fetch('/api/bot/test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: token })
+          body: JSON.stringify({ token: token, proxy: proxy })
         });
         const data = await res.json();
         if (data.status === 'ok') {
