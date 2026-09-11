@@ -93,9 +93,41 @@ def init_db():
             created_at TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
             FOREIGN KEY (connection_id) REFERENCES connections (id) ON DELETE CASCADE,
-            UNIQUE(user_id, device_index_k)
+            UNIQUE(user_id, connection_id, device_index_k)
         );
         """)
+
+        # Auto-migrate peer_configs table to scope UNIQUE by connection_id
+        peer_schema_row = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='peer_configs'").fetchone()
+        if peer_schema_row and peer_schema_row[0]:
+            schema_clean = peer_schema_row[0].replace(" ", "").replace("\n", "").replace("\r", "")
+            if "UNIQUE(user_id,device_index_k)" in schema_clean:
+                conn.execute("PRAGMA foreign_keys = OFF")
+                conn.execute("ALTER TABLE peer_configs RENAME TO peer_configs_old")
+                conn.execute("""
+                    CREATE TABLE peer_configs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        connection_id INTEGER NOT NULL,
+                        device_index_k INTEGER NOT NULL,
+                        label TEXT NOT NULL,
+                        client_ip TEXT NOT NULL,
+                        client_private_key TEXT NOT NULL,
+                        client_public_key TEXT NOT NULL,
+                        preshared_key TEXT,
+                        is_enabled INTEGER DEFAULT 1,
+                        created_at TEXT NOT NULL,
+                        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                        FOREIGN KEY (connection_id) REFERENCES connections (id) ON DELETE CASCADE,
+                        UNIQUE(user_id, connection_id, device_index_k)
+                    )
+                """)
+                conn.execute("""
+                    INSERT INTO peer_configs (id, user_id, connection_id, device_index_k, label, client_ip, client_private_key, client_public_key, preshared_key, is_enabled, created_at)
+                    SELECT id, user_id, connection_id, device_index_k, label, client_ip, client_private_key, client_public_key, preshared_key, is_enabled, created_at FROM peer_configs_old
+                """)
+                conn.execute("DROP TABLE peer_configs_old")
+                conn.execute("PRAGMA foreign_keys = ON")
 
         # Auto-migrate users table if columns are missing
         user_cols = [col["name"] for col in conn.execute("PRAGMA table_info(users)").fetchall()]
@@ -616,15 +648,24 @@ def delete_user(user_id: int) -> None:
 
 
 # Peer Helpers
-def get_next_device_k(user_id: int) -> int:
+def get_next_device_k(user_id: int, connection_id: Optional[int] = None) -> int:
     with get_db() as conn:
-        row = conn.execute(
-            "SELECT MAX(device_index_k) as max_k FROM peer_configs WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()
-        if row and row["max_k"] is not None:
-            return row["max_k"] + 1
-        return 1
+        if connection_id:
+            rows = conn.execute(
+                "SELECT device_index_k FROM peer_configs WHERE user_id = ? AND connection_id = ? ORDER BY device_index_k ASC",
+                (user_id, connection_id),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT device_index_k FROM peer_configs WHERE user_id = ? ORDER BY device_index_k ASC",
+                (user_id,),
+            ).fetchall()
+
+        used_k = {r["device_index_k"] for r in rows}
+        for k in range(1, 255):
+            if k not in used_k:
+                return k
+        return len(used_k) + 1
 
 
 def create_peer(
@@ -635,8 +676,9 @@ def create_peer(
     client_private_key: str,
     client_public_key: str,
     preshared_key: Optional[str] = None,
+    device_index_k: Optional[int] = None,
 ) -> int:
-    k = get_next_device_k(user_id)
+    k = device_index_k if device_index_k is not None else get_next_device_k(user_id, connection_id)
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute(

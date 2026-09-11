@@ -845,7 +845,7 @@ async def api_create_peer(req: CreatePeerRequest, request: Request):
         else:
             raise HTTPException(status_code=400, detail="Нет доступных подключений AWG")
 
-    k = get_next_device_k(user["id"])
+    k = get_next_device_k(user["id"], conn["id"])
     if k > 254:
         raise HTTPException(status_code=400, detail="Превышен лимит устройств в подсети пользователя (макс. 254)")
 
@@ -861,6 +861,7 @@ async def api_create_peer(req: CreatePeerRequest, request: Request):
         client_private_key=priv,
         client_public_key=pub,
         preshared_key=psk,
+        device_index_k=k,
     )
 
     # Sync with target node
@@ -1004,7 +1005,7 @@ async def api_my_create_device(req: UserCreateOwnDeviceRequest, request: Request
         else:
             raise HTTPException(status_code=400, detail="Нет доступных подключений AWG")
 
-    k = get_next_device_k(user["id"])
+    k = get_next_device_k(user["id"], conn["id"])
     if k > 254:
         raise HTTPException(status_code=400, detail="Превышен лимит устройств (макс. 254)")
 
@@ -1021,6 +1022,7 @@ async def api_my_create_device(req: UserCreateOwnDeviceRequest, request: Request
         client_private_key=priv,
         client_public_key=pub,
         preshared_key=psk,
+        device_index_k=k,
     )
 
     sync_peer_to_node(peer_id)
