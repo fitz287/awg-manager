@@ -34,6 +34,7 @@ from app.awg_manager import (
     generate_client_config_text,
     generate_server_config_text,
     get_interface_conf_file,
+    get_interface_detailed_status,
     get_interface_live_status,
     remove_connection_files,
     remove_peer_from_node,
@@ -556,8 +557,26 @@ async def api_create_connection(req: CreateConnectionRequest, request: Request):
     fwmark = req.fwmark if req.fwmark is not None else next_mrk
     listen_port = req.listen_port if req.listen_port is not None else get_next_listen_port()
 
-    # Protocol parameters
-    params = req.params or generate_awg_params(req.protocol_version)
+    # Protocol parameters: use manual params if provided, otherwise generate
+    if req.params:
+        params = dict(req.params)
+        # Normalize integer fields if passed as strings or ints
+        for k in ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4"):
+            if k in params and params[k] is not None:
+                try:
+                    params[k] = int(params[k])
+                except (ValueError, TypeError):
+                    pass
+        # RandomTrailers normalization
+        if "RandomTrailers" in params:
+            rt = str(params["RandomTrailers"]).lower()
+            params["RandomTrailers"] = 1 if rt in ("1", "true", "on", "yes") else 0
+        # If AWG 3.1 and HeaderProtectionKey is missing, auto-generate it
+        if req.protocol_version in ("3.0", "3.1") and not params.get("HeaderProtectionKey"):
+            from app.awg_crypto import generate_header_protection_key
+            params["HeaderProtectionKey"] = generate_header_protection_key()
+    else:
+        params = generate_awg_params(req.protocol_version)
     params["protocol_version"] = req.protocol_version
 
     # Keys
@@ -582,6 +601,15 @@ async def api_create_connection(req: CreateConnectionRequest, request: Request):
     write_server_config(conn_id)
 
     return {"status": "success", "id": conn_id, "name": name}
+
+
+@app.get("/api/connections/{conn_id}/status")
+async def api_get_connection_status(conn_id: int, request: Request):
+    require_admin(request)
+    status_data = get_interface_detailed_status(conn_id)
+    if status_data.get("status") == "error":
+        raise HTTPException(status_code=404, detail=status_data.get("detail", "Подключение не найдено"))
+    return status_data
 
 
 @app.post("/api/connections/{conn_id}/start")

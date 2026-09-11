@@ -211,6 +211,60 @@ class TestFastAPIEndpoints(unittest.TestCase):
         del_server_ok = self.client.delete(f"/api/servers/{node_id}")
         self.assertEqual(del_server_ok.status_code, 200)
 
+    def test_06_custom_params_and_connection_status(self):
+        self.client.post("/api/auth/login", json={"username": "admin", "password": "password"})
+
+        custom_params = {
+            "Jc": "4",
+            "Jmin": "50",
+            "Jmax": "1000",
+            "S1": "123",
+            "S2": "52",
+            "S3": "24",
+            "S4": "12",
+            "H1": "691076",
+            "H2": "3050423",
+            "H3": "48076392",
+            "H4": "710707124",
+            "ContentPaddingAddition": "10-100",
+            "RekeyAfterTime": "100-120",
+            "RekeyTimeout": "3-7",
+            "RejectAfterTime": "150-180",
+            "KeepaliveTimeout": "5-15",
+            "MaxHandshakeAttempts": "15-20",
+            "RandomTrailers": "on",
+        }
+
+        payload = {
+            "name": "awg88",
+            "protocol_version": "3.1",
+            "x_subnet": 88,
+            "listen_port": 51888,
+            "xray_port": 7088,
+            "table_num": 188,
+            "fwmark": 88,
+            "params": custom_params,
+        }
+
+        res = self.client.post("/api/connections", json=payload)
+        self.assertEqual(res.status_code, 200)
+        conn_id = res.json()["id"]
+
+        # Check status endpoint
+        status_res = self.client.get(f"/api/connections/{conn_id}/status")
+        self.assertEqual(status_res.status_code, 200)
+        status_data = status_res.json()
+        self.assertEqual(status_data["name"], "awg88")
+        self.assertEqual(status_data["listen_port"], 51888)
+        self.assertEqual(status_data["params"]["Jc"], 4)
+        self.assertEqual(status_data["params"]["S1"], 123)
+        self.assertEqual(status_data["params"]["RekeyAfterTime"], "100-120")
+        self.assertIn("peers", status_data)
+
+        # Cleanup
+        del_res = self.client.delete(f"/api/connections/{conn_id}")
+        self.assertEqual(del_res.status_code, 200)
+
 if __name__ == "__main__":
     unittest.main()
 

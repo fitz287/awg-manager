@@ -563,19 +563,55 @@
           </div>
         </div>
 
+        <!-- Obfuscation Parameters: Mode Switch (Auto vs Manual) -->
         <div class="border border-slate-800 rounded-xl overflow-hidden">
-          <div class="w-full px-3.5 sm:px-4 py-2.5 bg-slate-950/50 flex items-center justify-between text-xs text-slate-400 gap-2">
-            <button type="button" onclick="toggleParamsPreview()" class="flex items-center gap-1.5 font-medium hover:text-slate-200 truncate">
-              <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 shrink-0"></i>
-              <span class="truncate">Параметры обфускации</span>
-              <i id="preview-arrow" data-lucide="chevron-down" class="w-4 h-4 transition-transform inline-block ml-1 shrink-0"></i>
-            </button>
-            <button type="button" onclick="regenerateParams(event)" class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-400 hover:text-indigo-300 text-[11px] font-medium transition border border-slate-700/50">
-              <i data-lucide="refresh-cw" class="w-3 h-3"></i>
-              <span>Перегенерировать</span>
-            </button>
+          <div class="px-3.5 sm:px-4 py-2.5 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-300">
+              <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-indigo-400"></i>
+              <span>Параметры маскировки</span>
+            </div>
+            <!-- Mode Switch Tabs -->
+            <div class="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800 text-xs">
+              <button type="button" onclick="setParamsInputMode('auto')" id="btn-params-auto" class="px-2.5 py-1 rounded-md font-medium transition text-white bg-indigo-600 shadow-sm">
+                Авто-генерация
+              </button>
+              <button type="button" onclick="setParamsInputMode('manual')" id="btn-params-manual" class="px-2.5 py-1 rounded-md font-medium transition text-slate-400 hover:text-slate-200">
+                Вручную
+              </button>
+            </div>
           </div>
-          <div id="params-preview-box" class="hidden p-3.5 sm:p-4 bg-slate-950/80 border-t border-slate-800 text-xs font-mono space-y-1 text-slate-300 max-h-48 overflow-y-auto"></div>
+
+          <!-- Mode A: Auto-generated Preview -->
+          <div id="params-box-auto" class="p-3 sm:p-4 bg-slate-950/40 space-y-2.5">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>Сгенерированные параметры для <span id="auto-proto-label" class="font-bold text-indigo-300">AWG 1.0</span>:</span>
+              <button type="button" onclick="regenerateParams(event)" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-400 hover:text-indigo-300 text-[11px] font-medium transition border border-slate-700/50">
+                <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                <span>Перегенерировать</span>
+              </button>
+            </div>
+            <div id="params-preview-box" class="p-3 bg-slate-950 border border-slate-800/80 rounded-lg text-xs font-mono space-y-1 text-slate-300 max-h-44 overflow-y-auto"></div>
+          </div>
+
+          <!-- Mode B: Manual Text Input -->
+          <div id="params-box-manual" class="hidden p-3 sm:p-4 bg-slate-950/40 space-y-3">
+            <div class="flex items-center justify-between text-xs text-slate-400 flex-wrap gap-2">
+              <span>Вставьте параметры в формате <code class="text-indigo-300 font-mono">Ключ = Значение</code>:</span>
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="fillParamsTemplate()" class="px-2 py-0.5 text-[11px] bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 rounded border border-indigo-500/30 transition">
+                  Заполнить шаблоном
+                </button>
+                <button type="button" onclick="clearManualParams()" class="px-2 py-0.5 text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-400 rounded transition">
+                  Очистить
+                </button>
+              </div>
+            </div>
+            <textarea id="conn-manual-params" rows="6" oninput="onManualParamsInput()" placeholder="Jc = 4&#10;Jmin = 50&#10;Jmax = 1000&#10;S1 = 123&#10;S2 = 52&#10;S3 = 24&#10;S4 = 12&#10;H1 = 691076&#10;H2 = 3050423&#10;H3 = 48076392&#10;H4 = 710707124&#10;ContentPaddingAddition = 10-100&#10;RekeyAfterTime = 100-120&#10;RekeyTimeout = 3-7&#10;RejectAfterTime = 150-180&#10;KeepaliveTimeout = 5-15&#10;MaxHandshakeAttempts = 15-20&#10;RandomTrailers = on" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-indigo-200 font-mono focus:border-indigo-500 focus:outline-none leading-relaxed"></textarea>
+            <div id="manual-params-status" class="text-xs text-slate-400 flex items-center justify-between">
+              <span id="manual-params-badge" class="text-slate-500">Введите параметры выше...</span>
+              <span class="text-[11px] text-slate-500">Поддерживаются AWG 1.0, 2.0, 3.1 и тайминги</span>
+            </div>
+          </div>
         </div>
 
         <div class="pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
@@ -587,6 +623,107 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CONNECTION LIVE STATUS (Admin) -->
+  <div id="modal-conn-status" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[92vh] flex flex-col">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-9 h-9 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center shrink-0">
+            <i data-lucide="activity" class="w-5 h-5"></i>
+          </div>
+          <div class="min-w-0">
+            <h3 class="font-bold text-white text-base flex items-center gap-2 truncate">
+              <span id="conn-status-title">Состояние подключения</span>
+              <span id="conn-status-proto-badge" class="px-2 py-0.5 rounded-full text-xs font-mono font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">AWG</span>
+            </h3>
+            <p id="conn-status-subtitle" class="text-xs text-slate-400 truncate">Сбор данных в реальном времени с сервера...</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="refreshConnStatus()" id="btn-refresh-conn-status" title="Обновить статус" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition active:scale-95 flex items-center gap-1.5 text-xs">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Обновить</span>
+          </button>
+          <button onclick="closeModal('modal-conn-status')" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
+        <!-- Summary Stat Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="p-3 bg-slate-950/70 border border-slate-800/80 rounded-xl">
+            <div class="text-[11px] uppercase font-semibold text-slate-400">Статус интерфейса</div>
+            <div id="conn-status-badge" class="mt-1 font-bold text-sm text-emerald-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              Загрузка...
+            </div>
+          </div>
+          <div class="p-3 bg-slate-950/70 border border-slate-800/80 rounded-xl">
+            <div class="text-[11px] uppercase font-semibold text-slate-400">Порт / Подсеть</div>
+            <div id="conn-status-port-subnet" class="mt-1 font-mono text-xs sm:text-sm text-indigo-300 font-semibold truncate">—</div>
+          </div>
+          <div class="p-3 bg-slate-950/70 border border-slate-800/80 rounded-xl">
+            <div class="text-[11px] uppercase font-semibold text-slate-400">Трафик (Rx / Tx)</div>
+            <div id="conn-status-traffic" class="mt-1 font-mono text-xs sm:text-sm text-white font-semibold truncate">—</div>
+          </div>
+          <div class="p-3 bg-slate-950/70 border border-slate-800/80 rounded-xl">
+            <div class="text-[11px] uppercase font-semibold text-slate-400">Активные пиры</div>
+            <div id="conn-status-peers-count" class="mt-1 font-bold text-sm text-amber-300 truncate">—</div>
+          </div>
+        </div>
+
+        <!-- Real-Time Peers Table -->
+        <div class="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/40">
+          <div class="px-4 py-3 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="users" class="w-4 h-4 text-indigo-400"></i>
+              <span class="font-semibold text-sm text-white">Пиры подключения (Хендшейки и Трафик)</span>
+            </div>
+            <span id="conn-status-peers-subtitle" class="text-xs text-slate-400"></span>
+          </div>
+
+          <div id="conn-status-peers-list" class="divide-y divide-slate-800/60 max-h-72 overflow-y-auto">
+            <div class="p-6 text-center text-slate-500 text-xs">Загрузка информации о пирах...</div>
+          </div>
+        </div>
+
+        <!-- Obfuscation Parameters Accordion -->
+        <div class="border border-slate-800 rounded-xl overflow-hidden">
+          <button type="button" onclick="toggleDetailsBlock('conn-status-params-body', 'conn-status-params-arrow')" class="w-full px-4 py-3 bg-slate-950/70 flex items-center justify-between text-xs text-slate-300 hover:text-white transition">
+            <span class="font-semibold flex items-center gap-2">
+              <i data-lucide="shield" class="w-4 h-4 text-indigo-400"></i>
+              Активные параметры обфускации ядра
+            </span>
+            <i id="conn-status-params-arrow" data-lucide="chevron-down" class="w-4 h-4 transition-transform"></i>
+          </button>
+          <div id="conn-status-params-body" class="hidden p-4 bg-slate-950/50 border-t border-slate-800 text-xs font-mono grid grid-cols-2 sm:grid-cols-3 gap-2 text-slate-300"></div>
+        </div>
+
+        <!-- Raw awg show output Accordion -->
+        <div class="border border-slate-800 rounded-xl overflow-hidden">
+          <button type="button" onclick="toggleDetailsBlock('conn-status-raw-body', 'conn-status-raw-arrow')" class="w-full px-4 py-3 bg-slate-950/70 flex items-center justify-between text-xs text-slate-300 hover:text-white transition">
+            <span class="font-semibold flex items-center gap-2">
+              <i data-lucide="terminal" class="w-4 h-4 text-slate-400"></i>
+              Консольный вывод (awg show)
+            </span>
+            <i id="conn-status-raw-arrow" data-lucide="chevron-down" class="w-4 h-4 transition-transform"></i>
+          </button>
+          <div id="conn-status-raw-body" class="hidden p-4 bg-slate-950 border-t border-slate-800">
+            <pre id="conn-status-raw-pre" class="text-[11px] font-mono text-emerald-400 whitespace-pre-wrap break-all select-all max-h-60 overflow-y-auto"></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-4 sm:px-6 py-3 border-t border-slate-800 bg-dark-900 flex justify-end">
+        <button type="button" onclick="closeModal('modal-conn-status')" class="px-5 py-2 text-sm text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition">
+          Закрыть
+        </button>
+      </div>
     </div>
   </div>
 
@@ -1839,6 +1976,9 @@
                       <i data-lucide="play" class="w-4 h-4"></i>
                     </button>`
                 }
+                <button onclick="openConnStatusModal(${c.id}, '${c.name}')" title="Состояние подключения и пиры" class="p-2 sm:p-2.5 rounded-xl bg-indigo-600/20 text-indigo-400 hover:text-white hover:bg-indigo-600 transition active:scale-95">
+                  <i data-lucide="activity" class="w-4 h-4"></i>
+                </button>
                 <button onclick="viewServerConfig(${c.id}, '${c.name}')" title="Просмотр .conf" class="p-2 sm:p-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition active:scale-95">
                   <i data-lucide="file-code" class="w-4 h-4"></i>
                 </button>
@@ -1879,6 +2019,7 @@
           `).join('');
         }
 
+        setParamsInputMode('auto');
         onProtocolChange('1.0');
         openModal('modal-create-conn');
       } catch (err) {
@@ -1886,16 +2027,133 @@
       }
     }
 
+    let paramsInputMode = 'auto'; // 'auto' | 'manual'
+
+    function setParamsInputMode(mode) {
+      paramsInputMode = mode;
+      const btnAuto = document.getElementById('btn-params-auto');
+      const btnManual = document.getElementById('btn-params-manual');
+      const boxAuto = document.getElementById('params-box-auto');
+      const boxManual = document.getElementById('params-box-manual');
+
+      if (mode === 'manual') {
+        btnAuto.className = 'px-2.5 py-1 rounded-md font-medium transition text-slate-400 hover:text-slate-200';
+        btnManual.className = 'px-2.5 py-1 rounded-md font-medium transition text-white bg-indigo-600 shadow-sm';
+        boxAuto.classList.add('hidden');
+        boxManual.classList.remove('hidden');
+        if (!document.getElementById('conn-manual-params').value.trim()) {
+          fillParamsTemplate();
+        }
+      } else {
+        btnAuto.className = 'px-2.5 py-1 rounded-md font-medium transition text-white bg-indigo-600 shadow-sm';
+        btnManual.className = 'px-2.5 py-1 rounded-md font-medium transition text-slate-400 hover:text-slate-200';
+        boxAuto.classList.remove('hidden');
+        boxManual.classList.add('hidden');
+      }
+    }
+
     function onProtocolChange(version) {
       currentProtocol = version;
-      if (!nextDefaults || !nextDefaults.params_preview) return;
+      const lbl = document.getElementById('auto-proto-label');
+      if (lbl) lbl.innerText = `AWG ${version}`;
 
-      const p = nextDefaults.params_preview[version];
-      let html = '';
-      for (const [k, v] of Object.entries(p)) {
-        html += `<div class="flex justify-between py-0.5"><span class="text-slate-400">${k}:</span> <span class="text-indigo-300 font-mono break-all font-semibold">${v}</span></div>`;
+      if (nextDefaults && nextDefaults.params_preview) {
+        const p = nextDefaults.params_preview[version];
+        if (p) {
+          let html = '';
+          for (const [k, v] of Object.entries(p)) {
+            html += `<div class="flex justify-between py-0.5"><span class="text-slate-400">${k}:</span> <span class="text-indigo-300 font-mono break-all font-semibold">${v}</span></div>`;
+          }
+          document.getElementById('params-preview-box').innerHTML = html;
+        }
       }
-      document.getElementById('params-preview-box').innerHTML = html;
+
+      if (paramsInputMode === 'manual') {
+        fillParamsTemplate();
+      }
+    }
+
+    function fillParamsTemplate() {
+      const textarea = document.getElementById('conn-manual-params');
+      if (currentProtocol === '1.0') {
+        textarea.value = `Jc = 4\nJmin = 50\nJmax = 1000\nS1 = 120\nS2 = 50\nH1 = 691076\nH2 = 3050423\nH3 = 48076392\nH4 = 710707124`;
+      } else if (currentProtocol === '2.0') {
+        textarea.value = `Jc = 4\nJmin = 50\nJmax = 1000\nS1 = 120\nS2 = 50\nS3 = 30\nS4 = 25\nH1 = 691076\nH2 = 3050423\nH3 = 48076392\nH4 = 710707124`;
+      } else {
+        // AWG 3.1
+        textarea.value = `Jc = 4\nJmin = 50\nJmax = 1000\nS1 = 123\nS2 = 52\nS3 = 24\nS4 = 12\nH1 = 691076\nH2 = 3050423\nH3 = 48076392\nH4 = 710707124\nContentPaddingAddition = 10-100\nRekeyAfterTime = 100-120\nRekeyTimeout = 3-7\nRejectAfterTime = 150-180\nKeepaliveTimeout = 5-15\nMaxHandshakeAttempts = 15-20\nRandomTrailers = on`;
+      }
+      onManualParamsInput();
+    }
+
+    function clearManualParams() {
+      const textarea = document.getElementById('conn-manual-params');
+      textarea.value = '';
+      onManualParamsInput();
+    }
+
+    function parseManualParamsText(text) {
+      if (!text || !text.trim()) return { params: {}, count: 0 };
+      const lines = text.split('\n');
+      const params = {};
+      const intKeys = new Set(['jc', 'jmin', 'jmax', 's1', 's2', 's3', 's4', 'h1', 'h2', 'h3', 'h4']);
+
+      for (let rawLine of lines) {
+        let line = rawLine.trim();
+        if (!line || line.startsWith('#') || line.startsWith(';')) continue;
+        let sepIdx = line.indexOf('=');
+        if (sepIdx === -1) sepIdx = line.indexOf(':');
+        if (sepIdx === -1) continue;
+
+        let key = line.substring(0, sepIdx).trim();
+        let val = line.substring(sepIdx + 1).trim();
+        if (!key) continue;
+
+        let lowerKey = key.toLowerCase();
+        let canonicalKey = key;
+
+        const keyMap = {
+          'jc': 'Jc', 'jmin': 'Jmin', 'jmax': 'Jmax',
+          's1': 'S1', 's2': 'S2', 's3': 'S3', 's4': 'S4',
+          'h1': 'H1', 'h2': 'H2', 'h3': 'H3', 'h4': 'H4',
+          'headerprotectionkey': 'HeaderProtectionKey',
+          'contentpaddingaddition': 'ContentPaddingAddition',
+          'randomtrailers': 'RandomTrailers',
+          'rekeyaftertime': 'RekeyAfterTime',
+          'rekeytimeout': 'RekeyTimeout',
+          'rejectaftertime': 'RejectAfterTime',
+          'keepalivetimeout': 'KeepaliveTimeout',
+          'maxhandshakeattempts': 'MaxHandshakeAttempts',
+        };
+        if (keyMap[lowerKey]) {
+          canonicalKey = keyMap[lowerKey];
+        }
+
+        if (intKeys.has(lowerKey)) {
+          let num = parseInt(val, 10);
+          if (!isNaN(num)) params[canonicalKey] = num;
+        } else if (lowerKey === 'randomtrailers') {
+          params[canonicalKey] = (val.toLowerCase() === 'on' || val === '1' || val.toLowerCase() === 'true') ? 1 : 0;
+        } else {
+          params[canonicalKey] = val;
+        }
+      }
+      return { params, count: Object.keys(params).length };
+    }
+
+    function onManualParamsInput() {
+      const text = document.getElementById('conn-manual-params').value;
+      const { params, count } = parseManualParamsText(text);
+      const badge = document.getElementById('manual-params-badge');
+
+      if (count > 0) {
+        badge.innerHTML = `<span class="text-emerald-400 font-semibold">✓ Распознано параметров: ${count}</span>`;
+      } else if (text.trim()) {
+        badge.innerHTML = `<span class="text-amber-400">Формат не распознан. Используйте Ключ = Значение</span>`;
+      } else {
+        badge.innerText = 'Введите параметры выше...';
+        badge.className = 'text-slate-500';
+      }
     }
 
     async function regenerateParams(e) {
@@ -1916,22 +2174,23 @@
       }
     }
 
-    function toggleParamsPreview() {
-      const box = document.getElementById('params-preview-box');
-      const arrow = document.getElementById('preview-arrow');
-      box.classList.toggle('hidden');
-      if (!box.classList.contains('hidden')) {
-        arrow.classList.add('rotate-180');
-      } else {
-        arrow.classList.remove('rotate-180');
-      }
-    }
-
     async function submitCreateConnection(e) {
       e.preventDefault();
-      const chosenParams = (nextDefaults && nextDefaults.params_preview && nextDefaults.params_preview[currentProtocol])
-        ? nextDefaults.params_preview[currentProtocol]
-        : undefined;
+      let chosenParams = undefined;
+
+      if (paramsInputMode === 'manual') {
+        const rawText = document.getElementById('conn-manual-params').value;
+        const parsed = parseManualParamsText(rawText);
+        if (parsed.count === 0) {
+          showToast('Пожалуйста, введите параметры маскировки или выберите Авто-генерацию', 'error');
+          return;
+        }
+        chosenParams = parsed.params;
+      } else {
+        chosenParams = (nextDefaults && nextDefaults.params_preview && nextDefaults.params_preview[currentProtocol])
+          ? nextDefaults.params_preview[currentProtocol]
+          : undefined;
+      }
 
       const payload = {
         server_id: parseInt(document.getElementById('conn-server-id').value) || 1,
@@ -1959,6 +2218,128 @@
         await loadConnections();
       } catch (err) {
         showToast(err.message, 'error');
+      }
+    }
+
+    // --- CONNECTION STATUS MODAL FUNCTIONS ---
+    let activeStatusConnId = null;
+    let activeStatusConnName = '';
+
+    async function openConnStatusModal(connId, name) {
+      activeStatusConnId = connId;
+      activeStatusConnName = name;
+      openModal('modal-conn-status');
+
+      document.getElementById('conn-status-title').innerText = `Состояние подключения ${name}`;
+      document.getElementById('conn-status-subtitle').innerText = `Загрузка данных с сервера...`;
+      document.getElementById('conn-status-badge').innerHTML = `<span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span> Опрос сервера...`;
+      document.getElementById('conn-status-port-subnet').innerText = '...';
+      document.getElementById('conn-status-traffic').innerText = '...';
+      document.getElementById('conn-status-peers-count').innerText = '...';
+      document.getElementById('conn-status-peers-list').innerHTML = `<div class="p-6 text-center text-slate-500 text-xs">Опрос сервера и интерфейса...</div>`;
+
+      await refreshConnStatus();
+    }
+
+    async function refreshConnStatus() {
+      if (!activeStatusConnId) return;
+      const btn = document.getElementById('btn-refresh-conn-status');
+      const icon = btn ? (btn.querySelector('svg') || btn.querySelector('i')) : null;
+      if (icon) icon.classList.add('animate-spin');
+
+      try {
+        const res = await fetch(`/api/connections/${activeStatusConnId}/status`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Не удалось получить статус подключения');
+
+        // Header & badge
+        document.getElementById('conn-status-proto-badge').innerText = `AWG ${data.protocol_version}`;
+        document.getElementById('conn-status-subtitle').innerText = `Сервер: ${escapeHtml(data.server_name)} (${escapeHtml(data.server_host)})`;
+
+        const isRunning = data.is_running;
+        document.getElementById('conn-status-badge').innerHTML = isRunning
+          ? `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> <span class="text-emerald-400">Активен</span>`
+          : `<span class="w-2 h-2 rounded-full bg-rose-400"></span> <span class="text-rose-400">Остановлен</span>`;
+
+        document.getElementById('conn-status-port-subnet').innerText = `Порт ${data.listen_port} (10.${data.x_subnet}.0.0/16)`;
+        document.getElementById('conn-status-traffic').innerText = `${data.rx_bytes} ↓ / ${data.tx_bytes} ↑`;
+        document.getElementById('conn-status-peers-count').innerText = `${data.active_peers_count} из ${data.peer_count} активны`;
+        document.getElementById('conn-status-peers-subtitle').innerText = `Всего пиров: ${data.peer_count}`;
+
+        // Render peers list
+        const listEl = document.getElementById('conn-status-peers-list');
+        if (!data.peers || !data.peers.length) {
+          listEl.innerHTML = `<div class="p-6 text-center text-slate-500 text-xs">Нет привязанных пиров в этом подключении</div>`;
+        } else {
+          listEl.innerHTML = data.peers.map(p => {
+            const hasHandshake = p.has_handshake;
+            const handshakeBadge = hasHandshake
+              ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ${escapeHtml(p.latest_handshake)}
+                 </span>`
+              : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700/50">
+                   <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> ${escapeHtml(p.latest_handshake)}
+                 </span>`;
+
+            return `
+              <div class="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-slate-900/50 transition">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-bold text-white text-sm truncate">${escapeHtml(p.username)}</span>
+                    <span class="px-2 py-0.5 rounded-md bg-slate-800 text-indigo-300 font-mono text-[11px] border border-slate-700/50">
+                      ${escapeHtml(p.device_label)}
+                    </span>
+                    ${p.client_ip ? `<span class="text-xs font-mono text-slate-400 bg-slate-950 px-1.5 py-0.5 rounded">${escapeHtml(p.client_ip)}</span>` : ''}
+                  </div>
+                  <div class="text-[11px] text-slate-400 font-mono mt-1.5 truncate">
+                    <span class="text-slate-500">Endpoint:</span> <span class="text-slate-300 font-semibold">${escapeHtml(p.endpoint)}</span>
+                    <span class="mx-1.5 text-slate-600">|</span>
+                    <span class="text-slate-500">Ключ:</span> <span class="text-slate-400">${escapeHtml(p.public_key.substring(0, 14))}...</span>
+                  </div>
+                </div>
+
+                <div class="flex items-center sm:flex-col sm:items-end justify-between sm:justify-center gap-1.5 shrink-0">
+                  <div>${handshakeBadge}</div>
+                  <div class="text-[11px] font-mono text-slate-300 font-medium">${escapeHtml(p.transfer)}</div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+
+        // Render params accordion
+        const paramsBody = document.getElementById('conn-status-params-body');
+        if (data.params && Object.keys(data.params).length) {
+          let pHtml = '';
+          for (const [k, v] of Object.entries(data.params)) {
+            pHtml += `<div class="p-2 bg-slate-900/60 rounded-lg border border-slate-800/60"><span class="text-slate-400 block text-[10px] uppercase font-semibold">${k}</span><span class="text-indigo-300 break-all font-mono">${v}</span></div>`;
+          }
+          paramsBody.innerHTML = pHtml;
+        } else {
+          paramsBody.innerHTML = `<div class="col-span-full text-slate-500 text-center py-2">Параметры не найдены</div>`;
+        }
+
+        // Raw output
+        document.getElementById('conn-status-raw-pre').innerText = data.raw_output || 'Нет консольного вывода';
+
+        lucide.createIcons();
+      } catch (err) {
+        showToast('Ошибка обновления статуса: ' + err.message, 'error');
+      } finally {
+        if (icon) icon.classList.remove('animate-spin');
+      }
+    }
+
+    function toggleDetailsBlock(bodyId, arrowId) {
+      const body = document.getElementById(bodyId);
+      const arrow = document.getElementById(arrowId);
+      body.classList.toggle('hidden');
+      if (arrow) {
+        if (!body.classList.contains('hidden')) {
+          arrow.classList.add('rotate-180');
+        } else {
+          arrow.classList.remove('rotate-180');
+        }
       }
     }
 

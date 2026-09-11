@@ -63,7 +63,11 @@ def build_awg_params_block(params: Dict[str, Any]) -> List[str]:
         if "ContentPaddingAddition" in params and params["ContentPaddingAddition"]:
             lines.append(f"ContentPaddingAddition = {params['ContentPaddingAddition']}")
         if "RandomTrailers" in params and params["RandomTrailers"]:
-            lines.append(f"RandomTrailers = {params['RandomTrailers']}")
+            rt_val = params['RandomTrailers']
+            lines.append(f"RandomTrailers = {'on' if str(rt_val).lower() in ('1', 'true', 'on') else rt_val}")
+        for key in ("RekeyAfterTime", "RekeyTimeout", "RejectAfterTime", "KeepaliveTimeout", "MaxHandshakeAttempts"):
+            if key in params and params[key] is not None:
+                lines.append(f"{key} = {params[key]}")
 
     # Optional AWG 2.0 signatures
     for i in range(1, 6):
@@ -369,6 +373,16 @@ def remove_connection_files(name: str, server_id: Optional[int] = None) -> None:
             pass
 
 
+def fmt_bytes(b: int) -> str:
+    if b < 1024:
+        return f"{b} B"
+    elif b < 1024 * 1024:
+        return f"{b / 1024:.1f} KB"
+    elif b < 1024 * 1024 * 1024:
+        return f"{b / (1024 * 1024):.1f} MB"
+    return f"{b / (1024 * 1024 * 1024):.2f} GB"
+
+
 def get_interface_live_status(conn_id: int) -> Dict[str, Any]:
     """Fetches real-time status of interface (handshake, bytes, active peers)."""
     conn = get_connection_by_id(conn_id)
@@ -378,7 +392,7 @@ def get_interface_live_status(conn_id: int) -> Dict[str, Any]:
     name = conn["name"]
     server = get_server_by_id(conn.get("server_id", 1))
 
-    if server and server.get("host"):
+    if server and server.get("host") and server.get("id") != 1:
         client = NodeClient(server)
         stats = client.get_interface_stats(name)
         if stats.get("is_running"):
@@ -386,15 +400,6 @@ def get_interface_live_status(conn_id: int) -> Dict[str, Any]:
             peer_count = stats.get("peer_count", 0)
             rx_bytes = stats.get("rx_bytes", 0)
             tx_bytes = stats.get("tx_bytes", 0)
-
-            def fmt_bytes(b: int) -> str:
-                if b < 1024:
-                    return f"{b} B"
-                elif b < 1024 * 1024:
-                    return f"{b / 1024:.1f} KB"
-                elif b < 1024 * 1024 * 1024:
-                    return f"{b / (1024 * 1024):.1f} MB"
-                return f"{b / (1024 * 1024 * 1024):.2f} GB"
 
             return {
                 "status": "active",
@@ -452,6 +457,173 @@ def get_interface_live_status(conn_id: int) -> Dict[str, Any]:
         "last_handshake": last_handshake,
         "peers_connected": peers_connected,
         "raw_info": awg_out if ok_awg else "",
+    }
+
+
+def get_interface_detailed_status(conn_id: int) -> Dict[str, Any]:
+    """
+    Fetches comprehensive diagnostic status of an interface:
+    - Interface running status, server, ports, subnet
+    - Total Rx/Tx traffic
+    - Real-time peers list with endpoints, handshakes, transfers, mapped to username/device
+    - Obfuscation parameters
+    - Full raw output of awg show
+    """
+    conn = get_connection_by_id(conn_id)
+    if not conn:
+        return {"status": "error", "detail": "Подключение не найдено"}
+
+    name = conn["name"]
+    server = get_server_by_id(conn.get("server_id", 1))
+    server_name = server["name"] if server else "Основной сервер"
+    server_host = server["host"] if server else "127.0.0.1"
+
+    # Known peers from DB
+    db_peers = get_peers_by_connection(conn_id)
+    peer_db_map = {}
+    for p in db_peers:
+        u = get_user_by_id(p["user_id"])
+        username = u["username"] if u else f"user_{p['user_id']}"
+        peer_db_map[p["client_public_key"]] = {
+            "id": p["id"],
+            "user_id": p["user_id"],
+            "username": username,
+            "label": p["label"],
+            "client_ip": p["client_ip"],
+            "is_enabled": bool(p["is_enabled"]),
+        }
+
+    is_running = False
+    raw_output = ""
+    peers_dict = {}
+    rx_bytes = 0
+    tx_bytes = 0
+
+    # 1. Check remote node
+    if server and server.get("host") and server.get("id") != 1:
+        client = NodeClient(server)
+        stats = client.get_interface_stats(name)
+        is_running = stats.get("is_running", False)
+        rx_bytes = stats.get("rx_bytes", 0)
+        tx_bytes = stats.get("tx_bytes", 0)
+        for pub, pdata in stats.get("peers", {}).items():
+            peers_dict[pub] = {
+                "public_key": pub,
+                "endpoint": pdata.get("endpoint", ""),
+                "allowed_ips": pdata.get("allowed_ips", ""),
+                "latest_handshake": pdata.get("latest_handshake", ""),
+                "transfer": pdata.get("transfer_raw", ""),
+            }
+        raw_output = f"# Node: {server_name} ({server_host})\n# Interface: {name}\n# Running: {is_running}\n"
+    else:
+        # 2. Local / Master server
+        if IS_LINUX:
+            ok_link, _ = run_system_cmd(["ip", "link", "show", name])
+            is_running = ok_link
+            if ok_link:
+                ok_awg, awg_out = run_system_cmd(["awg", "show", name])
+                if not ok_awg:
+                    ok_awg, awg_out = run_system_cmd(["wg", "show", name])
+
+                if ok_awg and awg_out:
+                    raw_output = awg_out
+                    current_peer = None
+                    for line in awg_out.splitlines():
+                        sline = line.strip()
+                        if sline.startswith("peer:"):
+                            current_peer = sline.split(":", 1)[1].strip()
+                            peers_dict[current_peer] = {
+                                "public_key": current_peer,
+                                "endpoint": "",
+                                "allowed_ips": "",
+                                "latest_handshake": "",
+                                "transfer": "",
+                            }
+                        elif current_peer and sline.startswith("endpoint:"):
+                            peers_dict[current_peer]["endpoint"] = sline.split(":", 1)[1].strip()
+                        elif current_peer and sline.startswith("allowed ips:"):
+                            peers_dict[current_peer]["allowed_ips"] = sline.split(":", 1)[1].strip()
+                        elif current_peer and sline.startswith("latest handshake:"):
+                            peers_dict[current_peer]["latest_handshake"] = sline.split(":", 1)[1].strip()
+                        elif current_peer and sline.startswith("transfer:"):
+                            peers_dict[current_peer]["transfer"] = sline.split(":", 1)[1].strip()
+
+                try:
+                    with open(f"/sys/class/net/{name}/statistics/rx_bytes", "r") as f:
+                        rx_bytes = int(f.read().strip())
+                    with open(f"/sys/class/net/{name}/statistics/tx_bytes", "r") as f:
+                        tx_bytes = int(f.read().strip())
+                except Exception:
+                    pass
+        else:
+            # Mock mode for Windows development
+            is_running = bool(conn["is_active"])
+            raw_output = f"# Mock Interface Status (Windows Dev)\ninterface: {name}\n  listening port: {conn['listen_port']}\n"
+            for p in db_peers:
+                peers_dict[p["client_public_key"]] = {
+                    "public_key": p["client_public_key"],
+                    "endpoint": "88.201.151.83:53513" if p.get("client_ip", "").endswith(".3") else "",
+                    "allowed_ips": f"{p['client_ip']}/32",
+                    "latest_handshake": "1 минуту назад" if p.get("client_ip", "").endswith(".3") else "—",
+                    "transfer": "12.5 KiB received, 16.2 KiB sent" if p.get("client_ip", "").endswith(".3") else "",
+                }
+
+    # Merge peers with DB info
+    peers_list = []
+    seen_keys = set()
+    for pub, pdata in peers_dict.items():
+        seen_keys.add(pub)
+        db_info = peer_db_map.get(pub, {})
+        has_handshake = bool(pdata["latest_handshake"] and pdata["latest_handshake"] != "—" and "не" not in pdata["latest_handshake"].lower())
+        peers_list.append({
+            "public_key": pub,
+            "username": db_info.get("username", "Неизвестный"),
+            "device_label": db_info.get("label", "Устройство"),
+            "client_ip": db_info.get("client_ip", pdata.get("allowed_ips", "")),
+            "endpoint": pdata.get("endpoint", "") or "—",
+            "latest_handshake": pdata.get("latest_handshake", "") or "Нет связи",
+            "has_handshake": has_handshake,
+            "transfer": pdata.get("transfer", "") or "0 B",
+            "is_enabled": db_info.get("is_enabled", True),
+        })
+
+    # Add any DB peers not currently in awg show output
+    for pub, db_info in peer_db_map.items():
+        if pub not in seen_keys:
+            peers_list.append({
+                "public_key": pub,
+                "username": db_info.get("username", "Неизвестный"),
+                "device_label": db_info.get("label", "Устройство"),
+                "client_ip": db_info.get("client_ip", ""),
+                "endpoint": "—",
+                "latest_handshake": "Нет связи",
+                "has_handshake": False,
+                "transfer": "0 B",
+                "is_enabled": db_info.get("is_enabled", True),
+            })
+
+    peers_list.sort(key=lambda x: (not x["has_handshake"], x["username"]))
+
+    return {
+        "status": "active" if is_running else "stopped",
+        "is_running": is_running,
+        "name": name,
+        "listen_port": conn["listen_port"],
+        "x_subnet": conn["x_subnet"],
+        "protocol_version": conn.get("protocol_version", "1.0"),
+        "server_id": conn.get("server_id", 1),
+        "server_name": server_name,
+        "server_host": server_host,
+        "table_num": conn.get("table_num", 101),
+        "fwmark": conn.get("fwmark", 1),
+        "xray_port": conn.get("xray_port", 7010),
+        "rx_bytes": fmt_bytes(rx_bytes) if rx_bytes else "0 B",
+        "tx_bytes": fmt_bytes(tx_bytes) if tx_bytes else "0 B",
+        "peer_count": len(peers_list),
+        "active_peers_count": sum(1 for p in peers_list if p["has_handshake"]),
+        "peers": peers_list,
+        "params": conn.get("params", {}),
+        "raw_output": raw_output.strip(),
     }
 
 
