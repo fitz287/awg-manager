@@ -173,3 +173,39 @@ def generate_awg_params(protocol_version: str) -> Dict[str, Any]:
         # Default fallback to 1.0
         return generate_awg_params("1.0")
 
+
+def encode_amnezia_vpn_url(vpn_dict: Dict[str, Any]) -> str:
+    """
+    Encodes an Amnezia VPN container JSON config into a vpn:// URL
+    using Qt qCompress (4-byte big-endian uncompressed length + zlib deflate)
+    and URL-safe Base64 without trailing padding.
+    """
+    import json
+    import struct
+    import zlib
+
+    json_bytes = json.dumps(vpn_dict, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    compressed = zlib.compress(json_bytes, 8)
+    header = struct.pack(">I", len(json_bytes))
+    data = header + compressed
+    b64 = base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+    return f"vpn://{b64}"
+
+
+def decode_amnezia_vpn_url(vpn_url: str) -> Dict[str, Any]:
+    """Decodes a vpn:// URL back into its container JSON dictionary."""
+    import json
+    import zlib
+
+    raw_b64 = vpn_url.strip()
+    if raw_b64.startswith("vpn://"):
+        raw_b64 = raw_b64[6:]
+    pad = len(raw_b64) % 4
+    if pad:
+        raw_b64 += "=" * (4 - pad)
+    data = base64.urlsafe_b64decode(raw_b64)
+    # First 4 bytes are uncompressed length, remainder is zlib deflate
+    decompressed = zlib.decompress(data[4:])
+    return json.loads(decompressed.decode("utf-8"))
+
+

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Мои подключения AmneziaWG</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0b0f19; color: #f3f4f6; }
+    .card-glass { background: rgba(22, 27, 46, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    .btn-gradient { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+    .btn-gradient:hover { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); }
+    .modal-overlay { background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(8px); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 md:p-8">
+  <div class="w-full max-w-4xl space-y-6">
+    
+    <!-- Top Bar -->
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center card-glass p-6 rounded-2xl gap-4">
+      <div class="flex items-center space-x-4">
+        <div class="w-12 h-12 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center text-2xl border border-blue-500/30">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            AmneziaWG <span class="text-xs uppercase bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded border border-blue-500/30">Personal</span>
+          </h1>
+          <p class="text-sm text-gray-400">Пользователь: <span class="font-medium text-gray-200">{{ user.username }}</span></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 w-full md:w-auto">
+        <a href="/api/users/{{ user.id }}/export-zip" class="flex-1 md:flex-none text-center bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm font-medium py-2.5 px-4 rounded-xl border border-gray-700 transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-file-zipper text-blue-400"></i> Скачать всё (ZIP)
+        </a>
+      </div>
+    </header>
+
+    <!-- Universal Subscription Section -->
+    <section class="card-glass p-5 rounded-2xl space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+          <i class="fa-solid fa-link text-indigo-400"></i> Ссылка подписки (для Karing, Sing-box, NekoBox)
+        </h2>
+        <span class="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Автообновление</span>
+      </div>
+      <div class="flex items-center gap-2 bg-gray-900/80 p-2 rounded-xl border border-gray-800">
+        <input type="text" readonly value="{{ sub_url }}" id="subInput" class="bg-transparent border-none text-xs text-gray-300 w-full focus:outline-none px-2 font-mono">
+        <button onclick="copySubLink()" id="copySubBtn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition flex items-center gap-1.5 shrink-0">
+          <i class="fa-regular fa-clone"></i> <span>Скопировать</span>
+        </button>
+      </div>
+      <p class="text-xs text-gray-500">
+        Вставьте эту ссылку в поддерживаемый клиент (Karing, NekoBox, Happ), чтобы автоматически получить профили всех серверов.
+      </p>
+    </section>
+
+    <!-- Peers List -->
+    <section class="space-y-4">
+      <h2 class="text-lg font-semibold text-gray-200 flex items-center gap-2">
+        <i class="fa-solid fa-server text-blue-400"></i> Доступные подключения ({{ peers|length }})
+      </h2>
+
+      {% if not peers %}
+      <div class="card-glass p-8 rounded-2xl text-center text-gray-400">
+        <i class="fa-solid fa-network-wired text-4xl mb-3 text-gray-600"></i>
+        <p>У вас пока нет активных подключений. Обратитесь к администратору.</p>
+      </div>
+      {% endif %}
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% for peer in peers %}
+        <div class="card-glass p-5 rounded-2xl flex flex-col justify-between space-y-4 hover:border-blue-500/40 transition">
+          <div class="space-y-2">
+            <div class="flex justify-between items-start">
+              <div>
+                <h3 class="font-bold text-white text-base flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  {{ peer.server_name }}
+                </h3>
+                <p class="text-xs text-blue-400 font-mono">{{ peer.connection_name }} &bull; AWG {{ peer.protocol_version }}</p>
+              </div>
+              <span class="bg-gray-800 text-gray-300 text-xs px-2.5 py-1 rounded-full border border-gray-700">
+                {{ peer.label }}
+              </span>
+            </div>
+
+            <div class="bg-gray-900/60 p-2.5 rounded-xl border border-gray-800/80 text-xs space-y-1">
+              <div class="flex justify-between text-gray-400">
+                <span>Внутренний IP:</span>
+                <span class="text-gray-200 font-mono">{{ peer.client_ip }}</span>
+              </div>
+              <div class="flex justify-between text-gray-400">
+                <span>Сервер:</span>
+                <span class="text-gray-200 font-mono">{{ peer.server_host }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Buttons -->
+          <div class="grid grid-cols-2 gap-2 pt-2 border-t border-gray-800/60">
+            <a href="/api/peers/{{ peer.id }}/config" download class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-download"></i> .conf (AWG)
+            </a>
+            <button onclick="showQrModal({{ peer.id }}, '{{ peer.server_name }} ({{ peer.connection_name }})')" class="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-medium py-2 px-3 rounded-xl border border-gray-700 transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-qrcode"></i> QR-код
+            </button>
+            <a href="/api/peers/{{ peer.id }}/vpn" download class="bg-purple-600/80 hover:bg-purple-600 text-white text-xs font-medium py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 col-span-2">
+              <i class="fa-solid fa-shield-cat"></i> Скачать Amnezia .vpn
+            </a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- Quick Instructions -->
+    <section class="card-glass p-5 rounded-2xl space-y-3 text-xs text-gray-400">
+      <h3 class="font-semibold text-sm text-gray-200 flex items-center gap-2">
+        <i class="fa-solid fa-circle-info text-blue-400"></i> Инструкция по подключению
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+        <div class="space-y-1">
+          <p class="font-medium text-gray-300">1. Официальный AmneziaWG:</p>
+          <p>Скачайте приложение <b>AmneziaWG</b>, нажмите «+» и выберите «Импорт из файла» (скачанный <code>.conf</code>) или отсканируйте <b>QR-код</b> с экрана.</p>
+        </div>
+        <div class="space-y-1">
+          <p class="font-medium text-gray-300">2. Клиент Amnezia VPN:</p>
+          <p>Скачайте <b>Amnezia VPN</b>, выберите «Добавить подключение» &rarr; «Открыть файл с настройками» и выберите <code>.vpn</code> файл.</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- QR Modal -->
+  <div id="qrModal" class="fixed inset-0 modal-overlay flex items-center justify-center p-4 hidden z-50">
+    <div class="card-glass p-6 rounded-2xl max-w-sm w-full space-y-4 text-center border border-gray-700 relative">
+      <button onclick="closeQrModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+      <h3 id="modalTitle" class="text-base font-bold text-white">QR-код для подключения</h3>
+      <div id="qrcode" class="p-3 bg-white rounded-xl inline-block shadow-lg mx-auto"></div>
+      <p class="text-xs text-gray-400">Откройте приложение <b>AmneziaWG</b> на смартфоне, нажмите «+» и отсканируйте код камерой.</p>
+      <button onclick="closeQrModal()" class="w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-xl text-xs font-medium transition">
+        Закрыть
+      </button>
+    </div>
+  </div>
+
+  <script>
+    function copySubLink() {
+      const input = document.getElementById('subInput');
+      input.select();
+      navigator.clipboard.writeText(input.value);
+      const btn = document.getElementById('copySubBtn');
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>Скопировано!</span>';
+      btn.classList.replace('bg-indigo-600', 'bg-emerald-600');
+      setTimeout(() => {
+        btn.innerHTML = orig;
+        btn.classList.replace('bg-emerald-600', 'bg-indigo-600');
+      }, 2000);
+    }
+
+    let qrInstance = null;
+    async function showQrModal(peerId, title) {
+      document.getElementById('modalTitle').textContent = title;
+      const modal = document.getElementById('qrModal');
+      const qrDiv = document.getElementById('qrcode');
+      qrDiv.innerHTML = '<div class="p-6 text-gray-800 text-xs"><i class="fa-solid fa-spinner fa-spin"></i> Загрузка...</div>';
+      modal.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/peers/' + peerId + '/config');
+        const confText = await res.text();
+        qrDiv.innerHTML = '';
+        new QRCode(qrDiv, {
+          text: confText,
+          width: 240,
+          height: 240,
+          correctLevel: QRCode.CorrectLevel.L
+        });
+      } catch (e) {
+        qrDiv.innerHTML = '<div class="p-4 text-red-500 text-xs">Ошибка загрузки конфигурации</div>';
+      }
+    }
+
+    function closeQrModal() {
+      document.getElementById('qrModal').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>

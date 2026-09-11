@@ -7,7 +7,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,6 +31,7 @@ from app.awg_crypto import (
     generate_preshared_key,
 )
 from app.awg_manager import (
+    generate_amnezia_vpn_data,
     generate_client_config_text,
     generate_server_config_text,
     get_interface_conf_file,
@@ -79,12 +80,15 @@ from app.database import (
     get_user_by_username,
     get_user_peers,
     get_users_by_connection,
+    get_user_by_sub_token,
+    get_user_by_telegram_id,
     init_db,
     set_setting,
     toggle_peer,
     update_connection_params,
     update_server_status,
     update_server_system_info,
+    update_user_details,
     update_user_password,
     update_user_status,
 )
@@ -116,6 +120,7 @@ async def auth_middleware(request: Request, call_next):
     if (
         path in ("/login", "/api/auth/login", "/install.sh", "/uninstall.sh")
         or path.startswith("/static")
+        or path.startswith("/sub")
         or path.startswith("/favicon.ico")
     ):
         return await call_next(request)
@@ -195,6 +200,14 @@ class CreateUserRequest(BaseModel):
     username: str
     notes: Optional[str] = ""
     password: Optional[str] = ""
+    telegram_id: Optional[str] = None
+
+
+class UpdateUserRequest(BaseModel):
+    username: Optional[str] = None
+    notes: Optional[str] = None
+    telegram_id: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 class ResetUserPasswordRequest(BaseModel):
@@ -223,6 +236,9 @@ class UpdateSettingsRequest(BaseModel):
     server_host: Optional[str] = None
     default_dns: str
     default_mtu: int
+    tg_bot_token: Optional[str] = None
+    tg_bot_enabled: Optional[str] = None
+
 
 
 # ----------------------------------------------------
@@ -771,11 +787,18 @@ async def api_create_user(req: CreateUserRequest, request: Request):
             raise HTTPException(status_code=400, detail="Пароль должен быть не менее 4 символов")
         pw_hash = hash_password(req.password.strip())
 
+    clean_tg = req.telegram_id.strip() if req.telegram_id and req.telegram_id.strip() else None
+    if clean_tg:
+        existing_tg = get_user_by_telegram_id(clean_tg)
+        if existing_tg:
+            raise HTTPException(status_code=400, detail=f"Пользователь с Telegram ID {clean_tg} уже привязан ({existing_tg['username']})")
+
     user_id = create_user(
         connection_id=req.connection_id,
         username=clean_user,
         notes=req.notes or "",
         password_hash=pw_hash,
+        telegram_id=clean_tg,
     )
     user = get_user_by_id(user_id)
     subnet = f"10.{conn['x_subnet']}.{user['user_index_y']}.0/24" if conn else f"10.*.{user['user_index_y']}.0/24"
@@ -786,7 +809,85 @@ async def api_create_user(req: CreateUserRequest, request: Request):
         "user_index_y": user["user_index_y"],
         "subnet": subnet,
         "has_password": bool(pw_hash),
+        "telegram_id": user.get("telegram_id"),
+        "subscription_token": user.get("subscription_token"),
     }
+
+
+@app.put("/api/users/{user_id}")
+async def api_update_user(user_id: int, req: UpdateUserRequest, request: Request):
+    require_admin(request)
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    if req.username:
+        clean_user = req.username.strip()
+        if not clean_user:
+            raise HTTPException(status_code=400, detail="Имя пользователя не может быть пустым")
+        existing = get_user_by_username(clean_user)
+        if existing and existing["id"] != user_id:
+            raise HTTPException(status_code=400, detail=f"Пользователь с именем '{clean_user}' уже существует")
+
+    if req.telegram_id is not None:
+        clean_tg = req.telegram_id.strip() if req.telegram_id.strip() else None
+        if clean_tg:
+            existing_tg = get_user_by_telegram_id(clean_tg)
+            if existing_tg and existing_tg["id"] != user_id:
+                raise HTTPException(status_code=400, detail=f"Telegram ID {clean_tg} уже привязан к '{existing_tg['username']}'")
+
+    update_user_details(
+        user_id=user_id,
+        username=req.username,
+        notes=req.notes,
+        telegram_id=req.telegram_id,
+    )
+    if req.is_active is not None:
+        update_user_status(user_id, req.is_active)
+
+    return {"status": "success", "message": "Данные пользователя обновлены"}
+
+
+@app.get("/api/users/{user_id}/export-zip")
+async def api_user_export_zip(user_id: int, request: Request):
+    auth = get_current_auth(request)
+    if not auth:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    if auth.get("role") != "admin" and auth.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    peers = get_user_peers(user_id)
+    import io, zipfile
+    bio = io.BytesIO()
+    with zipfile.ZipFile(bio, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in peers:
+            conn_name = p.get("connection_name") or "awg"
+            server_name = p.get("server_name") or "server"
+            label = p.get("label") or "device"
+            base_name = f"{user['username']}_{server_name}_{conn_name}_{label}".replace(" ", "_")
+            try:
+                conf_text = generate_client_config_text(p["id"])
+                zf.writestr(f"{base_name}.conf", conf_text)
+            except Exception as e:
+                logger.warning(f"Error creating conf in zip: {e}")
+            try:
+                vpn_dict, _ = generate_amnezia_vpn_data(p["id"])
+                zf.writestr(f"{base_name}.vpn", json.dumps(vpn_dict, indent=2, ensure_ascii=False))
+            except Exception as e:
+                logger.warning(f"Error creating vpn in zip: {e}")
+
+    bio.seek(0)
+    filename = f"awg_{user['username']}_configs.zip"
+    return Response(
+        content=bio.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
 
 
 @app.post("/api/users/{user_id}/reset-password")
@@ -904,6 +1005,37 @@ async def api_download_peer_config(peer_id: int, request: Request):
         media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.get("/api/peers/{peer_id}/vpn")
+async def api_download_peer_vpn(peer_id: int, request: Request):
+    auth = get_current_auth(request)
+    if not auth:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+
+    peer = get_peer_by_id(peer_id)
+    if not peer:
+        raise HTTPException(status_code=404, detail="Конфигурация устройства не найдена")
+
+    if auth.get("role") != "admin" and auth.get("user_id") != peer["user_id"]:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+
+    user = get_user_by_id(peer["user_id"])
+    conn = get_connection_by_id(peer["connection_id"]) or {}
+    username = user["username"] if user else "user"
+    clean_label = "".join(c for c in peer["label"] if c.isalnum() or c in ("-", "_")).strip() or "device"
+    filename = f"{username}_{conn.get('name', 'awg')}_{clean_label}.vpn"
+
+    vpn_dict, vpn_url = generate_amnezia_vpn_data(peer_id)
+    return Response(
+        content=json.dumps(vpn_dict, indent=2, ensure_ascii=False),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Amnezia-VPN-Url": vpn_url,
+        },
+    )
+
 
 
 @app.post("/api/peers/{peer_id}/toggle")
@@ -1118,10 +1250,14 @@ async def api_get_settings(request: Request):
     host = detect_public_ip()
     dns = get_setting("default_dns", DEFAULT_DNS)
     mtu = int(get_setting("default_mtu", str(DEFAULT_MTU)))
+    tg_token = get_setting("tg_bot_token", "")
+    tg_enabled = get_setting("tg_bot_enabled", "0")
     return {
         "server_host": host,
         "default_dns": dns,
         "default_mtu": mtu,
+        "tg_bot_token": tg_token,
+        "tg_bot_enabled": tg_enabled,
         "is_linux": IS_LINUX,
         "os_info": f"{platform.system()} {platform.release()}",
     }
@@ -1134,7 +1270,315 @@ async def api_update_settings(req: UpdateSettingsRequest, request: Request):
         set_setting("server_host", req.server_host.strip())
     set_setting("default_dns", req.default_dns.strip())
     set_setting("default_mtu", str(req.default_mtu))
+    if req.tg_bot_token is not None:
+        set_setting("tg_bot_token", req.tg_bot_token.strip())
+    if req.tg_bot_enabled is not None:
+        set_setting("tg_bot_enabled", req.tg_bot_enabled.strip())
+        if IS_LINUX:
+            try:
+                import subprocess
+                if req.tg_bot_enabled.strip() == "1":
+                    subprocess.run(["systemctl", "restart", "awg-bot"], check=False)
+                else:
+                    subprocess.run(["systemctl", "stop", "awg-bot"], check=False)
+            except Exception:
+                pass
+
     return {"status": "success", "message": "Настройки сохранены"}
+
+
+# ----------------------------------------------------
+# Telegram Bot Status & Testing API Endpoints
+# ----------------------------------------------------
+@app.get("/api/bot/status")
+async def api_bot_status(request: Request):
+    require_admin(request)
+    token = get_setting("tg_bot_token", "").strip()
+    enabled = get_setting("tg_bot_enabled", "0").strip() == "1"
+
+    service_active = False
+    if IS_LINUX:
+        try:
+            import subprocess
+            r = subprocess.run(["systemctl", "is-active", "awg-bot"], capture_output=True, text=True)
+            service_active = (r.stdout.strip() == "active")
+        except Exception:
+            service_active = False
+
+    return {
+        "has_token": bool(token),
+        "is_enabled": enabled,
+        "service_active": service_active,
+    }
+
+
+@app.post("/api/bot/test")
+async def api_bot_test(request: Request):
+    require_admin(request)
+    body = await request.json()
+    token = body.get("token", "").strip() or get_setting("tg_bot_token", "").strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="Токен Telegram-бота не задан")
+
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            res = await client.get(f"https://api.telegram.org/bot{token}/getMe")
+            data = res.json()
+            if data.get("ok"):
+                result = data.get("result", {})
+                return {
+                    "status": "ok",
+                    "username": result.get("username"),
+                    "first_name": result.get("first_name"),
+                    "bot_id": result.get("id"),
+                }
+            return {"status": "error", "detail": data.get("description", "Неверный токен")}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
+
+# ----------------------------------------------------
+# Backup & Restore API Endpoints (Admin)
+# ----------------------------------------------------
+@app.get("/api/admin/backup")
+async def api_admin_backup(request: Request):
+    require_admin(request)
+    from app.config import DB_PATH
+    import datetime
+    if not os.path.exists(DB_PATH):
+        raise HTTPException(status_code=500, detail="Файл базы данных не найден")
+    with open(DB_PATH, "rb") as f:
+        data = f.read()
+    now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"awg_panel_backup_{now_str}.db"
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/api/admin/restore")
+async def api_admin_restore(request: Request, file: UploadFile = File(...)):
+    require_admin(request)
+    from app.config import DB_PATH
+    content = await file.read()
+    if len(content) < 100 or not content.startswith(b"SQLite format 3\x00"):
+        raise HTTPException(status_code=400, detail="Загруженный файл не является корректной базой данных SQLite")
+
+    if os.path.exists(DB_PATH):
+        shutil.copy2(DB_PATH, f"{DB_PATH}.bak")
+
+    with open(DB_PATH, "wb") as f:
+        f.write(content)
+
+    init_db()
+    init_auth()
+
+    return {"status": "success", "message": "База данных успешно восстановлена из бэкапа"}
+
+
+# ----------------------------------------------------
+# Node Health & Monitoring API Endpoints
+# ----------------------------------------------------
+@app.get("/api/servers/{server_id}/health")
+async def api_server_health(server_id: int, request: Request):
+    require_admin(request)
+    server = get_server_by_id(server_id)
+    if not server:
+        raise HTTPException(status_code=404, detail="Сервер не найден")
+    client = NodeClient(server, timeout=5.0)
+    health = client.check_health_with_latency()
+    if health.get("status") == "online":
+        update_server_status(server_id, "online")
+    else:
+        update_server_status(server_id, "offline")
+    return health
+
+
+@app.get("/api/servers/health-all")
+async def api_servers_health_all(request: Request):
+    require_admin(request)
+    servers = get_all_servers()
+    import asyncio
+
+    async def check_one(srv):
+        c = NodeClient(srv, timeout=4.0)
+        h = await asyncio.to_thread(c.check_health_with_latency)
+        if h.get("status") == "online":
+            update_server_status(srv["id"], "online")
+        else:
+            update_server_status(srv["id"], "offline")
+        return srv["id"], h
+
+    results = await asyncio.gather(*(check_one(s) for s in servers))
+    return {sid: res for sid, res in results}
+
+
+# ----------------------------------------------------
+# Subscription & Self-Service Portal Endpoints (/sub/*)
+# ----------------------------------------------------
+@app.get("/sub/{token}")
+async def serve_subscription(token: str, request: Request, format: Optional[str] = None):
+    user = get_user_by_sub_token(token)
+    if not user:
+        raise HTTPException(status_code=404, detail="Подписка не найдена или деактивирована")
+
+    peers = get_user_peers(user["id"])
+    accept_header = request.headers.get("accept", "").lower()
+    user_agent = request.headers.get("user-agent", "").lower()
+
+    is_browser = "text/html" in accept_header and not format
+    if is_browser:
+        sub_url = str(request.url).split("?")[0]
+        return templates.TemplateResponse(
+            request=request,
+            name="sub_portal.html",
+            context={
+                "user": user,
+                "peers": peers,
+                "sub_url": sub_url,
+            },
+        )
+
+    if format == "sing-box" or "sing-box" in user_agent:
+        outbounds = []
+        for p in peers:
+            try:
+                conn = get_connection_by_id(p["connection_id"]) or {}
+                server = get_server_by_id(conn.get("server_id", 1)) or {}
+                host = server.get("host") or "127.0.0.1"
+                params = conn.get("params", {})
+                tag = f"{server.get('name', 'Server')} - {conn.get('name', 'AWG')}"
+                outbound = {
+                    "type": "amneziawg",
+                    "tag": tag,
+                    "server": host,
+                    "server_port": conn.get("listen_port", 51820),
+                    "local_address": [f"{p['client_ip']}/32"],
+                    "private_key": p["client_private_key"],
+                    "server_public_key": conn.get("server_public_key"),
+                    "mtu": int(get_setting("default_mtu", "1200")),
+                }
+                for k in ("jc", "jmin", "jmax", "s1", "s2", "s3", "s4", "h1", "h2", "h3", "h4"):
+                    upper_k = k.capitalize() if k in ("jc", "jmin", "jmax") else k.upper()
+                    if upper_k in params:
+                        outbound[k] = params[upper_k]
+                outbounds.append(outbound)
+            except Exception:
+                continue
+        return JSONResponse(content={"outbounds": outbounds})
+
+    # Base64 universal subscription
+    import base64
+    lines = []
+    for p in peers:
+        try:
+            conn = get_connection_by_id(p["connection_id"]) or {}
+            server = get_server_by_id(conn.get("server_id", 1)) or {}
+            host = server.get("host") or "127.0.0.1"
+            params = conn.get("params", {})
+            tag = f"{server.get('name', 'Server')}_{conn.get('name', 'AWG')}".replace(" ", "_")
+
+            query_parts = [
+                f"address={p['client_ip']}/32",
+                f"publickey={conn.get('server_public_key', '')}",
+            ]
+            if p.get("preshared_key"):
+                query_parts.append(f"presharedkey={p['preshared_key']}")
+            for k in ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4"):
+                if k in params:
+                    query_parts.append(f"{k.lower()}={params[k]}")
+
+            uri = f"wireguard://{p['client_private_key']}@{host}:{conn.get('listen_port', 51820)}/?{'&'.join(query_parts)}#{tag}"
+            lines.append(uri)
+        except Exception:
+            continue
+
+    body = "\n".join(lines)
+    if format == "raw":
+        return PlainTextResponse(content=body, media_type="text/plain; charset=utf-8")
+
+    b64_body = base64.b64encode(body.encode("utf-8")).decode("ascii")
+    return Response(
+        content=b64_body,
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Subscription-Userinfo": "upload=0; download=0; total=107374182400; expire=0",
+            "Profile-Update-Interval": "24",
+        },
+    )
+
+
+@app.get("/sub/{token}/conf/{peer_id}")
+async def serve_sub_conf(token: str, peer_id: int):
+    user = get_user_by_sub_token(token)
+    if not user:
+        raise HTTPException(status_code=404, detail="Неверная ссылка подписки")
+    peer = get_peer_by_id(peer_id)
+    if not peer or peer["user_id"] != user["id"]:
+        raise HTTPException(status_code=404, detail="Конфигурация не найдена")
+    conn = get_connection_by_id(peer["connection_id"]) or {}
+    filename = f"{user['username']}_{conn.get('name', 'awg')}_{peer.get('label', 'device')}.conf".replace(" ", "_")
+    conf_text = generate_client_config_text(peer_id)
+    return Response(
+        content=conf_text,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/sub/{token}/vpn/{peer_id}")
+async def serve_sub_vpn(token: str, peer_id: int):
+    user = get_user_by_sub_token(token)
+    if not user:
+        raise HTTPException(status_code=404, detail="Неверная ссылка подписки")
+    peer = get_peer_by_id(peer_id)
+    if not peer or peer["user_id"] != user["id"]:
+        raise HTTPException(status_code=404, detail="Конфигурация не найдена")
+    conn = get_connection_by_id(peer["connection_id"]) or {}
+    filename = f"{user['username']}_{conn.get('name', 'awg')}_{peer.get('label', 'device')}.vpn".replace(" ", "_")
+    vpn_dict, vpn_url = generate_amnezia_vpn_data(peer_id)
+    return Response(
+        content=json.dumps(vpn_dict, indent=2, ensure_ascii=False),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"', "X-Amnezia-VPN-Url": vpn_url},
+    )
+
+
+@app.get("/sub/{token}/export-zip")
+async def serve_sub_zip(token: str):
+    user = get_user_by_sub_token(token)
+    if not user:
+        raise HTTPException(status_code=404, detail="Неверная ссылка подписки")
+    peers = get_user_peers(user["id"])
+    import io, zipfile
+    bio = io.BytesIO()
+    with zipfile.ZipFile(bio, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in peers:
+            conn_name = p.get("connection_name") or "awg"
+            server_name = p.get("server_name") or "server"
+            label = p.get("label") or "device"
+            base_name = f"{user['username']}_{server_name}_{conn_name}_{label}".replace(" ", "_")
+            try:
+                conf_text = generate_client_config_text(p["id"])
+                zf.writestr(f"{base_name}.conf", conf_text)
+            except Exception:
+                pass
+            try:
+                vpn_dict, _ = generate_amnezia_vpn_data(p["id"])
+                zf.writestr(f"{base_name}.vpn", json.dumps(vpn_dict, indent=2, ensure_ascii=False))
+            except Exception:
+                pass
+    bio.seek(0)
+    filename = f"awg_{user['username']}_configs.zip"
+    return Response(
+        content=bio.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
 
 
 @app.get("/api/system/status")

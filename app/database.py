@@ -135,6 +135,16 @@ def init_db():
             conn.execute("ALTER TABLE users ADD COLUMN password_hash TEXT DEFAULT ''")
         if "is_active" not in user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1")
+        if "telegram_id" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN telegram_id TEXT DEFAULT NULL")
+        if "subscription_token" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN subscription_token TEXT DEFAULT NULL")
+
+        # Auto-populate subscription_token for existing users who don't have one
+        existing_users_no_sub = conn.execute("SELECT id FROM users WHERE subscription_token IS NULL OR subscription_token = ''").fetchall()
+        for u in existing_users_no_sub:
+            import secrets
+            conn.execute("UPDATE users SET subscription_token = ? WHERE id = ?", (secrets.token_urlsafe(16), u["id"]))
 
         # Auto-migrate connections table if server_id is missing
         conn_cols = [col["name"] for col in conn.execute("PRAGMA table_info(connections)").fetchall()]
@@ -146,6 +156,8 @@ def init_db():
         cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('default_dns', ?)", (DEFAULT_DNS,))
         cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('default_mtu', ?)", (str(DEFAULT_MTU),))
         cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('server_host', '')")
+        cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('tg_bot_token', '')")
+        cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('tg_bot_enabled', '0')")
 
 
 # Settings Helpers
@@ -592,6 +604,7 @@ def create_user(
     notes: str = "",
     password_hash: str = "",
     connection_id: Optional[int] = None,
+    telegram_id: Optional[str] = None,
     **kwargs,
 ) -> int:
     """
@@ -601,6 +614,7 @@ def create_user(
     - create_user(connection_id, username="name", ...)
     - create_user(username="name", connection_id=..., ...)
     """
+    import secrets
     conn_id = connection_id
     uname = username
 
@@ -615,7 +629,17 @@ def create_user(
     if not uname:
         raise ValueError("Имя пользователя не указано")
 
+    tg_id = telegram_id or kwargs.get("tg_id")
+    if tg_id:
+        tg_id = str(tg_id).strip()
+        if not tg_id:
+            tg_id = None
+    else:
+        tg_id = None
+
+    sub_token = kwargs.get("subscription_token") or secrets.token_urlsafe(16)
     y = get_next_user_y()
+
     with get_db() as conn:
         if not conn_id:
             row = conn.execute("SELECT id FROM connections ORDER BY id ASC LIMIT 1").fetchone()
@@ -624,12 +648,54 @@ def create_user(
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO users (connection_id, username, user_index_y, notes, password_hash, is_active, created_at)
-            VALUES (?, ?, ?, ?, ?, 1, ?)
+            INSERT INTO users (connection_id, username, user_index_y, notes, password_hash, telegram_id, subscription_token, is_active, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
             """,
-            (conn_id, uname.strip(), y, notes.strip(), password_hash, datetime.now(timezone.utc).isoformat()),
+            (conn_id, uname.strip(), y, notes.strip(), password_hash, tg_id, sub_token, datetime.now(timezone.utc).isoformat()),
         )
         return cur.lastrowid
+
+
+def update_user_details(
+    user_id: int,
+    username: Optional[str] = None,
+    notes: Optional[str] = None,
+    telegram_id: Optional[str] = None,
+) -> None:
+    with get_db() as conn:
+        fields = []
+        vals = []
+        if username is not None:
+            fields.append("username = ?")
+            vals.append(username.strip())
+        if notes is not None:
+            fields.append("notes = ?")
+            vals.append(notes.strip())
+        if telegram_id is not None:
+            fields.append("telegram_id = ?")
+            clean_tg = str(telegram_id).strip() if telegram_id and str(telegram_id).strip() else None
+            vals.append(clean_tg)
+        if fields:
+            vals.append(user_id)
+            conn.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = ?", tuple(vals))
+
+
+def get_user_by_telegram_id(telegram_id: str) -> Optional[Dict[str, Any]]:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE telegram_id = ? AND is_active = 1",
+            (str(telegram_id).strip(),),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_user_by_sub_token(token: str) -> Optional[Dict[str, Any]]:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE subscription_token = ? AND is_active = 1",
+            (str(token).strip(),),
+        ).fetchone()
+        return dict(row) if row else None
 
 
 def update_user_password(user_id: int, password_hash: str) -> None:

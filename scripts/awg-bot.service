@@ -1,0 +1,16 @@
+[Unit]
+Description=AmneziaWG Telegram Bot Service
+After=network.target network-online.target awg-manager.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/awg-manager
+ExecStart=/opt/awg-manager/venv/bin/python -m app.bot
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/opt/awg-manager
+
+[Install]
+WantedBy=multi-user.target

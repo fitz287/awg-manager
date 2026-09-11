@@ -35,6 +35,44 @@ class NodeClient:
         except Exception as e:
             return {"status": "offline", "error": str(e)}
 
+    def check_health_with_latency(self) -> Dict[str, Any]:
+        import time
+        t0 = time.perf_counter()
+        try:
+            with httpx.Client(timeout=self.timeout) as client:
+                res = client.get(f"{self.base_url}/api/agent/health")
+                latency_ms = round((time.perf_counter() - t0) * 1000, 1)
+                if res.status_code == 200:
+                    data = res.json()
+                    # Try to fetch metrics too
+                    try:
+                        metrics_res = client.get(f"{self.base_url}/api/agent/metrics", headers=self._headers())
+                        metrics = metrics_res.json() if metrics_res.status_code == 200 else {}
+                    except Exception:
+                        metrics = {}
+
+                    return {
+                        "status": "online",
+                        "latency_ms": latency_ms,
+                        "cpu_percent": metrics.get("cpu_percent", 0),
+                        "memory_percent": metrics.get("memory", {}).get("percent", 0),
+                        "uptime_hours": round(metrics.get("uptime_seconds", 0) / 3600, 1),
+                        "agent_version": data.get("version", "1.0.0"),
+                    }
+                return {
+                    "status": "error",
+                    "code": res.status_code,
+                    "latency_ms": latency_ms,
+                }
+        except Exception as e:
+            latency_ms = round((time.perf_counter() - t0) * 1000, 1)
+            return {
+                "status": "offline",
+                "error": str(e),
+                "latency_ms": latency_ms,
+            }
+
+
     def get_metrics(self) -> Dict[str, Any]:
         try:
             with httpx.Client(timeout=self.timeout) as client:

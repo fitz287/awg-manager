@@ -18,6 +18,8 @@ from app.database import (
 )
 from app.iptables_manager import format_wg_rules
 from app.node_client import NodeClient
+from app.awg_crypto import encode_amnezia_vpn_url
+
 
 
 def get_interface_dir(name: str) -> Path:
@@ -240,6 +242,73 @@ def generate_client_config_text(peer_id: int) -> str:
     lines.append("PersistentKeepalive = 25")
 
     return "\n".join(lines) + "\n"
+
+
+def generate_amnezia_vpn_data(peer_id: int) -> Tuple[Dict[str, Any], str]:
+    """
+    Generates Amnezia VPN container JSON structure and vpn:// URL string.
+    Returns (vpn_dict, vpn_url).
+    """
+    peer = get_peer_by_id(peer_id)
+    if not peer:
+        raise ValueError(f"Peer with id {peer_id} not found")
+
+    conn = get_connection_by_id(peer["connection_id"])
+    if not conn:
+        raise ValueError(f"Connection with id {peer['connection_id']} not found")
+
+    user = get_user_by_id(peer["user_id"])
+    username = user["username"] if user else "User"
+
+    server = get_server_by_id(conn.get("server_id", 1))
+    server_host = server["host"] if server and server.get("host") else get_setting("server_host", "").strip()
+    if not server_host:
+        server_host = "YOUR_SERVER_IP"
+
+    server_name = server["name"] if server and server.get("name") else "Server"
+    dns = get_setting("default_dns", "1.1.1.1, 8.8.8.8")
+    dns_parts = [d.strip() for d in dns.split(",") if d.strip()]
+    dns1 = dns_parts[0] if len(dns_parts) > 0 else "1.1.1.1"
+    dns2 = dns_parts[1] if len(dns_parts) > 1 else "8.8.8.8"
+    mtu = get_setting("default_mtu", "1200")
+
+    params = conn["params"]
+
+    awg_container_data: Dict[str, Any] = {
+        "client_priv_key": peer["client_private_key"],
+        "client_ip": peer["client_ip"],
+        "server_pub_key": conn["server_public_key"],
+        "port": str(conn["listen_port"]),
+        "transport_proto": "udp",
+        "mtu": str(mtu),
+        "clientId": str(peer["id"]),
+        "clientName": f"{username} - {peer['label']}",
+    }
+    if peer.get("preshared_key"):
+        awg_container_data["preshared_key"] = peer["preshared_key"]
+
+    for k in ["Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4", "I1", "I2", "I3", "HeaderProtectionKey"]:
+        if k in params and params[k] is not None:
+            awg_container_data[k] = str(params[k])
+
+    container_type = "amnezia-awg"
+    vpn_payload = {
+        "containers": [
+            {
+                "container": container_type,
+                "awg": awg_container_data,
+            }
+        ],
+        "defaultContainer": container_type,
+        "description": f"{server_name} - {conn['name']} ({username})",
+        "dns1": dns1,
+        "dns2": dns2,
+        "hostName": server_host,
+    }
+
+    vpn_url = encode_amnezia_vpn_url(vpn_payload)
+    return vpn_payload, vpn_url
+
 
 
 def run_system_cmd(cmd: List[str]) -> Tuple[bool, str]:
