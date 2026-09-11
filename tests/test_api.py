@@ -265,6 +265,76 @@ class TestFastAPIEndpoints(unittest.TestCase):
         del_res = self.client.delete(f"/api/connections/{conn_id}")
         self.assertEqual(del_res.status_code, 200)
 
+    def test_07_update_connection_params(self):
+        # 1. Login
+        self.client.post("/api/auth/login", json={"username": "admin", "password": "password"})
+
+        # 2. Create initial connection
+        payload = {
+            "name": "awg91",
+            "protocol_version": "1.0",
+            "x_subnet": 91,
+            "listen_port": 51891,
+            "xray_port": 7091,
+            "table_num": 191,
+            "fwmark": 91,
+        }
+        res = self.client.post("/api/connections", json=payload)
+        self.assertEqual(res.status_code, 200)
+        conn_id = res.json()["id"]
+
+        # 3. Update parameters via PUT
+        new_params = {
+            "protocol_version": "3.1",
+            "Jc": 4,
+            "Jmin": 50,
+            "Jmax": 1000,
+            "S1": 123,
+            "S2": 52,
+            "S3": 24,
+            "S4": 12,
+            "H1": 691076,
+            "H2": 3050423,
+            "H3": 48076392,
+            "H4": 710707124,
+            "HeaderProtectionKey": "abcdef1234567890abcdef1234567890abcdef12345=",
+            "ContentPaddingAddition": "10-100",
+            "RekeyAfterTime": "100-120",
+            "RekeyTimeout": "3-7",
+            "RejectAfterTime": "150-180",
+            "KeepaliveTimeout": "5-15",
+            "MaxHandshakeAttempts": "15-20",
+            "RandomTrailers": "on",
+        }
+        put_res = self.client.put(f"/api/connections/{conn_id}", json={
+            "listen_port": 20091,
+            "protocol_version": "3.1",
+            "params": new_params,
+        })
+        self.assertEqual(put_res.status_code, 200)
+        data = put_res.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["connection"]["listen_port"], 20091)
+        self.assertEqual(data["connection"]["protocol_version"], "3.1")
+        self.assertEqual(data["connection"]["params"]["Jc"], 4)
+        self.assertEqual(data["connection"]["params"]["S1"], 123)
+        self.assertEqual(data["connection"]["params"]["RekeyAfterTime"], "100-120")
+
+        # 4. Verify server config text contains new params
+        conf_res = self.client.get(f"/api/connections/{conn_id}/config")
+        self.assertEqual(conf_res.status_code, 200)
+        conf_text = conf_res.text
+        self.assertIn("ListenPort = 20091", conf_text)
+        self.assertIn("Jc = 4", conf_text)
+        self.assertIn("S1 = 123", conf_text)
+        self.assertIn("S4 = 12", conf_text)
+        self.assertIn("H1 = 691076", conf_text)
+        self.assertIn("RekeyAfterTime = 100-120", conf_text)
+
+        # Cleanup
+        del_res = self.client.delete(f"/api/connections/{conn_id}")
+        self.assertEqual(del_res.status_code, 200)
+
 if __name__ == "__main__":
     unittest.main()
 

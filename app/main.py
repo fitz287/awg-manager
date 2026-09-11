@@ -82,6 +82,7 @@ from app.database import (
     init_db,
     set_setting,
     toggle_peer,
+    update_connection_params,
     update_server_status,
     update_server_system_info,
     update_user_password,
@@ -180,6 +181,12 @@ class CreateConnectionRequest(BaseModel):
     xray_port: int = 7010
     table_num: Optional[int] = None
     fwmark: Optional[int] = None
+    params: Optional[Dict[str, Any]] = None
+
+
+class UpdateConnectionRequest(BaseModel):
+    listen_port: Optional[int] = None
+    protocol_version: Optional[str] = None
     params: Optional[Dict[str, Any]] = None
 
 
@@ -637,6 +644,63 @@ async def api_restart_connection(conn_id: int, request: Request):
     if not ok:
         raise HTTPException(status_code=500, detail=msg)
     return {"status": "success", "message": msg}
+
+
+@app.put("/api/connections/{conn_id}")
+async def api_update_connection(conn_id: int, req: UpdateConnectionRequest, request: Request):
+    require_admin(request)
+    conn = get_connection_by_id(conn_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Подключение не найдено")
+
+    listen_port = req.listen_port if req.listen_port is not None else conn["listen_port"]
+    proto = req.protocol_version or conn.get("protocol_version", "1.0")
+
+    current_params = dict(conn.get("params", {}))
+    if req.params is not None:
+        new_params = dict(req.params)
+        # Normalize integer fields
+        for k in ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4"):
+            if k in new_params and new_params[k] is not None:
+                try:
+                    new_params[k] = int(new_params[k])
+                except (ValueError, TypeError):
+                    pass
+        # RandomTrailers normalization
+        if "RandomTrailers" in new_params:
+            rt = str(new_params["RandomTrailers"]).lower()
+            new_params["RandomTrailers"] = 1 if rt in ("1", "true", "on", "yes") else 0
+
+        new_params["protocol_version"] = proto
+
+        # If AWG 3.1 and HeaderProtectionKey is missing, auto-generate it
+        if proto in ("3.0", "3.1") and not new_params.get("HeaderProtectionKey"):
+            from app.awg_crypto import generate_header_protection_key
+            new_params["HeaderProtectionKey"] = generate_header_protection_key()
+
+        current_params = new_params
+    else:
+        current_params["protocol_version"] = proto
+
+    # Update in database
+    update_connection_params(conn_id, current_params, listen_port=listen_port, protocol_version=proto)
+
+    # Re-write server config file
+    write_server_config(conn_id)
+
+    # If connection was active (or running), restart it
+    restarted = False
+    if conn.get("is_active"):
+        restart_connection(conn_id)
+        restarted = True
+
+    updated_conn = get_connection_by_id(conn_id)
+    return {
+        "status": "success",
+        "message": f"Параметры подключения {conn['name']} обновлены" + (" и интерфейс перезапущен" if restarted else ""),
+        "connection": updated_conn,
+        "restarted": restarted,
+    }
 
 
 @app.delete("/api/connections/{conn_id}")

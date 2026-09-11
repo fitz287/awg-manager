@@ -727,7 +727,89 @@
     </div>
   </div>
 
-  
+  <!-- MODAL: EDIT CONNECTION (Admin) -->
+  <div id="modal-edit-conn" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[92vh] flex flex-col">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+            <i data-lucide="sliders" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base flex items-center gap-2">
+              <span>Параметры подключения</span>
+              <span id="edit-conn-name-badge" class="font-mono text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">awg</span>
+            </h3>
+            <p class="text-xs text-slate-400">Настройка порта и параметров маскировки (обфускации)</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modal-edit-conn')" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form onsubmit="submitEditConnection(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
+        <input type="hidden" id="edit-conn-id" />
+
+        <!-- Warning Alert -->
+        <div class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-2.5 text-xs text-amber-300/90 leading-relaxed">
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+          <div>
+            <span class="font-semibold text-amber-300">Важно:</span> При изменении параметров маскировки AmneziaWG интерфейс перезапустится. Всем подключенным клиентам (пирам) потребуется скачать и импортировать обновленный конфиг, иначе они не смогут установить соединение!
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">Протокол AWG</label>
+            <select id="edit-conn-protocol" class="w-full bg-dark-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
+              <option value="1.0">AWG 1.0 (Стандартная маскировка)</option>
+              <option value="2.0">AWG 2.0 (Расширенный padding)</option>
+              <option value="3.1">AWG 3.1 (Header Protection + Паддинг)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">Порт ListenPort</label>
+            <input type="number" id="edit-conn-port" required min="1" max="65535"
+              class="w-full bg-dark-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
+          </div>
+        </div>
+
+        <!-- Obfuscation Parameters Textarea -->
+        <div class="border border-slate-800 rounded-xl overflow-hidden">
+          <div class="px-3.5 sm:px-4 py-2.5 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-300">
+              <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Параметры маскировки (Key = Value)</span>
+            </div>
+            <button type="button" onclick="formatEditParamsText()" class="px-2 py-0.5 text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/50 transition">
+              Форматировать
+            </button>
+          </div>
+
+          <div class="p-3 bg-slate-950/40 space-y-2">
+            <textarea id="edit-conn-params" rows="8" oninput="onEditParamsInput()"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-amber-200 font-mono focus:border-amber-500 focus:outline-none leading-relaxed"
+              placeholder="Jc = 4&#10;Jmin = 50&#10;Jmax = 1000&#10;S1 = 123&#10;S2 = 52&#10;S3 = 24&#10;S4 = 12&#10;H1 = 691076&#10;H2 = 3050423&#10;H3 = 48076392&#10;H4 = 710707124&#10;ContentPaddingAddition = 10-100&#10;RandomTrailers = on"></textarea>
+            <div class="text-xs text-slate-400 flex items-center justify-between">
+              <span id="edit-params-badge" class="text-slate-500">Загрузка параметров...</span>
+              <span class="text-[11px] text-slate-500 font-mono">Jc, Jmin, Jmax, S1-S4, H1-H4...</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
+          <button type="button" onclick="closeModal('modal-edit-conn')" class="w-full sm:w-auto px-4 py-2.5 text-sm text-slate-400 hover:text-slate-200 text-center rounded-xl bg-slate-800/40 sm:bg-transparent">
+            Отмена
+          </button>
+          <button type="submit" id="btn-save-edit-conn" class="w-full sm:w-auto px-5 py-2.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-semibold text-sm rounded-xl shadow transition text-center flex items-center justify-center gap-2">
+            <i data-lucide="check" class="w-4 h-4"></i>
+            <span>Сохранить и применить</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
   <!-- MODAL: ADD SERVER (Admin) -->
   <div id="modal-add-server" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
     <div class="bg-dark-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[92vh] flex flex-col">
@@ -1979,6 +2061,9 @@
                 <button onclick="openConnStatusModal(${c.id}, '${c.name}')" title="Состояние подключения и пиры" class="p-2 sm:p-2.5 rounded-xl bg-indigo-600/20 text-indigo-400 hover:text-white hover:bg-indigo-600 transition active:scale-95">
                   <i data-lucide="activity" class="w-4 h-4"></i>
                 </button>
+                <button onclick="openEditConnModal(${c.id})" title="Редактировать параметры и порт" class="p-2 sm:p-2.5 rounded-xl bg-amber-500/20 text-amber-400 hover:text-white hover:bg-amber-600 transition active:scale-95">
+                  <i data-lucide="sliders" class="w-4 h-4"></i>
+                </button>
                 <button onclick="viewServerConfig(${c.id}, '${c.name}')" title="Просмотр .conf" class="p-2 sm:p-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition active:scale-95">
                   <i data-lucide="file-code" class="w-4 h-4"></i>
                 </button>
@@ -2340,6 +2425,131 @@
         } else {
           arrow.classList.remove('rotate-180');
         }
+      }
+    }
+
+    // --- CONNECTION EDIT MODAL FUNCTIONS ---
+    let activeEditConnId = null;
+
+    function formatParamsAsLines(params) {
+      if (!params || typeof params !== 'object') return '';
+      const lines = [];
+      const order = [
+        'Jc', 'Jmin', 'Jmax',
+        'S1', 'S2', 'S3', 'S4',
+        'H1', 'H2', 'H3', 'H4',
+        'HeaderProtectionKey', 'ContentPaddingAddition', 'RandomTrailers',
+        'RekeyAfterTime', 'RekeyTimeout', 'RejectAfterTime', 'KeepaliveTimeout', 'MaxHandshakeAttempts'
+      ];
+      for (const k of order) {
+        if (params[k] !== undefined && params[k] !== null && params[k] !== '') {
+          let val = params[k];
+          if (k === 'RandomTrailers') {
+            val = (String(val).toLowerCase() === '1' || String(val).toLowerCase() === 'true' || String(val).toLowerCase() === 'on') ? 'on' : val;
+          }
+          lines.push(`${k} = ${val}`);
+        }
+      }
+      for (const [k, v] of Object.entries(params)) {
+        if (!order.includes(k) && k !== 'protocol_version' && v !== undefined && v !== null && v !== '') {
+          lines.push(`${k} = ${v}`);
+        }
+      }
+      return lines.join('\n');
+    }
+
+    function openEditConnModal(connId) {
+      const c = (connectionsData || []).find(x => x.id === connId);
+      if (!c) {
+        showToast('Подключение не найдено', 'error');
+        return;
+      }
+      activeEditConnId = connId;
+      document.getElementById('edit-conn-id').value = connId;
+      document.getElementById('edit-conn-name-badge').innerText = c.name;
+      document.getElementById('edit-conn-port').value = c.listen_port || '';
+      document.getElementById('edit-conn-protocol').value = c.protocol_version || '1.0';
+
+      const paramsText = formatParamsAsLines(c.params || {});
+      document.getElementById('edit-conn-params').value = paramsText;
+      onEditParamsInput();
+
+      openModal('modal-edit-conn');
+      lucide.createIcons();
+    }
+
+    function onEditParamsInput() {
+      const text = document.getElementById('edit-conn-params').value;
+      const { params, count } = parseManualParamsText(text);
+      const badge = document.getElementById('edit-params-badge');
+      if (count > 0) {
+        badge.innerHTML = `<span class="text-emerald-400 font-semibold">✓ Распознано параметров: ${count}</span>`;
+      } else if (text.trim()) {
+        badge.innerHTML = `<span class="text-amber-400">Формат не распознан. Используйте Ключ = Значение</span>`;
+      } else {
+        badge.innerText = 'Параметры отсутствуют';
+        badge.className = 'text-slate-500';
+      }
+    }
+
+    function formatEditParamsText() {
+      const text = document.getElementById('edit-conn-params').value;
+      const { params } = parseManualParamsText(text);
+      document.getElementById('edit-conn-params').value = formatParamsAsLines(params);
+      onEditParamsInput();
+    }
+
+    async function submitEditConnection(e) {
+      e.preventDefault();
+      const connId = activeEditConnId;
+      if (!connId) return;
+
+      const port = parseInt(document.getElementById('edit-conn-port').value);
+      if (!port || port < 1 || port > 65535) {
+        showToast('Укажите корректный порт (1-65535)', 'error');
+        return;
+      }
+
+      const proto = document.getElementById('edit-conn-protocol').value;
+      const rawText = document.getElementById('edit-conn-params').value;
+      const { params, count } = parseManualParamsText(rawText);
+
+      if (count === 0 && rawText.trim()) {
+        showToast('Проверьте синтаксис параметров маскировки', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btn-save-edit-conn');
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> <span>Применение...</span>`;
+      lucide.createIcons();
+
+      try {
+        const res = await fetch(`/api/connections/${connId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            listen_port: port,
+            protocol_version: proto,
+            params: params,
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showToast(data.message || 'Параметры успешно обновлены и применены!', 'success');
+          closeModal('modal-edit-conn');
+          await loadConnections();
+        } else {
+          showToast(data.detail || 'Ошибка при обновлении параметров', 'error');
+        }
+      } catch (err) {
+        showToast('Сетевая ошибка: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        lucide.createIcons();
       }
     }
 

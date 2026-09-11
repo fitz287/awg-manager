@@ -432,6 +432,27 @@ def update_connection_status(conn_id: int, is_active: bool) -> None:
         conn.execute("UPDATE connections SET is_active = ? WHERE id = ?", (1 if is_active else 0, conn_id))
 
 
+def update_connection_params(
+    conn_id: int,
+    params: Dict[str, Any],
+    listen_port: Optional[int] = None,
+    protocol_version: Optional[str] = None,
+) -> bool:
+    with get_db() as conn:
+        updates = ["params_json = ?"]
+        vals = [json.dumps(params)]
+        if listen_port is not None:
+            updates.append("listen_port = ?")
+            vals.append(listen_port)
+        if protocol_version is not None:
+            updates.append("protocol_version = ?")
+            vals.append(protocol_version)
+        vals.append(conn_id)
+        sql = f"UPDATE connections SET {', '.join(updates)} WHERE id = ?"
+        conn.execute(sql, tuple(vals))
+        return True
+
+
 def delete_connection(conn_id: int) -> Optional[str]:
     with get_db() as conn:
         row = conn.execute("SELECT name FROM connections WHERE id = ?", (conn_id,)).fetchone()

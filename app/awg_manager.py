@@ -345,9 +345,34 @@ def stop_connection(conn_id: int) -> Tuple[bool, str]:
 
 
 def restart_connection(conn_id: int) -> Tuple[bool, str]:
-    """Restarts the connection."""
-    stop_connection(conn_id)
-    return start_connection(conn_id)
+    """Restarts the connection, writing fresh config and applying changes."""
+    conn = get_connection_by_id(conn_id)
+    if not conn:
+        return False, "Подключение не найдено"
+
+    name = conn["name"]
+    server = get_server_by_id(conn.get("server_id", 1))
+
+    if server and server.get("host"):
+        stop_connection(conn_id)
+        return start_connection(conn_id)
+
+    # Local server
+    write_server_config(conn_id)
+    if IS_LINUX:
+        ok, out = run_system_cmd(["systemctl", "restart", f"awg-quick@{name}"])
+        if not ok:
+            stop_connection(conn_id)
+            ok, out = run_system_cmd(["awg-quick", "up", name])
+
+        if ok:
+            update_connection_status(conn_id, True)
+            return True, f"Интерфейс {name} успешно перезапущен"
+        else:
+            return False, f"Ошибка перезапуска {name}: {out}"
+    else:
+        update_connection_status(conn_id, True)
+        return True, f"[MOCK] Интерфейс {name} перезапущен"
 
 
 def remove_connection_files(name: str, server_id: Optional[int] = None) -> None:
