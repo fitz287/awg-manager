@@ -119,7 +119,7 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
     # Public routes
     if (
-        path in ("/login", "/api/auth/login", "/install.sh", "/uninstall.sh")
+        path in ("/login", "/api/auth/login", "/install.sh", "/uninstall.sh", "/robots.txt")
         or path.startswith("/static")
         or path.startswith("/sub")
         or path.startswith("/favicon.ico")
