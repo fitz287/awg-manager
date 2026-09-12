@@ -369,7 +369,7 @@ class TestFastAPIEndpoints(unittest.TestCase):
         # Verify ranges are preserved in DB
         get_res = self.client.get(f"/api/connections/{conn_id}/status")
         self.assertEqual(get_res.status_code, 200)
-        c_data = get_res.json()["connection"]
+        c_data = get_res.json()
         self.assertEqual(c_data["params"]["H1"], "1776002204-1856261239")
         self.assertEqual(c_data["params"]["H2"], "2131483220-2139616315")
         self.assertEqual(c_data["params"]["H3"], "2145540006-2146234083")
