@@ -335,6 +335,59 @@ class TestFastAPIEndpoints(unittest.TestCase):
         del_res = self.client.delete(f"/api/connections/{conn_id}")
         self.assertEqual(del_res.status_code, 200)
 
+    def test_08_awg2_ranges_and_signatures(self):
+        # Authenticate
+        self.client.post("/api/auth/login", json={"username": "admin", "password": "password"})
+
+        awg2_params = {
+            "Jc": 6,
+            "Jmin": 10,
+            "Jmax": 50,
+            "S1": 24,
+            "S2": 133,
+            "S3": 10,
+            "S4": 6,
+            "H1": "1776002204-1856261239",
+            "H2": "2131483220-2139616315",
+            "H3": "2145540006-2146234083",
+            "H4": "2146328963-2146998719",
+            "I1": "<r 2><b 0x858000010001000000000669636c6f756403636f6d0000010001c00c000100010000105a00044d583737>",
+        }
+        create_res = self.client.post("/api/connections", json={
+            "name": "awg2test",
+            "protocol_version": "2.0",
+            "x_subnet": 82,
+            "listen_port": 51882,
+            "xray_port": 7082,
+            "table_num": 182,
+            "fwmark": 82,
+            "params": awg2_params,
+        })
+        self.assertEqual(create_res.status_code, 200)
+        conn_id = create_res.json()["id"]
+
+        # Verify ranges are preserved in DB
+        get_res = self.client.get(f"/api/connections/{conn_id}/status")
+        self.assertEqual(get_res.status_code, 200)
+        c_data = get_res.json()["connection"]
+        self.assertEqual(c_data["params"]["H1"], "1776002204-1856261239")
+        self.assertEqual(c_data["params"]["H2"], "2131483220-2139616315")
+        self.assertEqual(c_data["params"]["H3"], "2145540006-2146234083")
+        self.assertEqual(c_data["params"]["H4"], "2146328963-2146998719")
+        self.assertEqual(c_data["params"]["I1"], awg2_params["I1"])
+
+        # Verify config text generation contains the exact ranges
+        conf_res = self.client.get(f"/api/connections/{conn_id}/config")
+        self.assertEqual(conf_res.status_code, 200)
+        self.assertIn("H1 = 1776002204-1856261239", conf_res.text)
+        self.assertIn("H2 = 2131483220-2139616315", conf_res.text)
+        self.assertIn("H3 = 2145540006-2146234083", conf_res.text)
+        self.assertIn("H4 = 2146328963-2146998719", conf_res.text)
+        self.assertIn(awg2_params["I1"], conf_res.text)
+
+        # Cleanup
+        self.client.delete(f"/api/connections/{conn_id}")
+
 if __name__ == "__main__":
     unittest.main()
 

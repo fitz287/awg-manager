@@ -586,13 +586,17 @@ async def api_create_connection(req: CreateConnectionRequest, request: Request):
     # Protocol parameters: use manual params if provided, otherwise generate
     if req.params:
         params = dict(req.params)
-        # Normalize integer fields if passed as strings or ints
+        # Normalize integer fields if passed as strings or ints (preserve ranges like '10-100' or '1776002204-1856261239')
         for k in ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4"):
             if k in params and params[k] is not None:
-                try:
-                    params[k] = int(params[k])
-                except (ValueError, TypeError):
-                    pass
+                val_str = str(params[k]).strip()
+                if "-" not in val_str:
+                    try:
+                        params[k] = int(val_str)
+                    except (ValueError, TypeError):
+                        params[k] = val_str
+                else:
+                    params[k] = val_str
         # RandomTrailers normalization
         if "RandomTrailers" in params:
             rt = str(params["RandomTrailers"]).lower()
@@ -678,13 +682,17 @@ async def api_update_connection(conn_id: int, req: UpdateConnectionRequest, requ
     current_params = dict(conn.get("params", {}))
     if req.params is not None:
         new_params = dict(req.params)
-        # Normalize integer fields
+        # Normalize integer fields (preserve ranges like '10-100' or '1776002204-1856261239')
         for k in ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4"):
             if k in new_params and new_params[k] is not None:
-                try:
-                    new_params[k] = int(new_params[k])
-                except (ValueError, TypeError):
-                    pass
+                val_str = str(new_params[k]).strip()
+                if "-" not in val_str:
+                    try:
+                        new_params[k] = int(val_str)
+                    except (ValueError, TypeError):
+                        new_params[k] = val_str
+                else:
+                    new_params[k] = val_str
         # RandomTrailers normalization
         if "RandomTrailers" in new_params:
             rt = str(new_params["RandomTrailers"]).lower()

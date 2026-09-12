@@ -2315,15 +2315,56 @@
       }
     }
 
+    function randomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function randomBase64(bytesLen) {
+      const arr = new Uint8Array(bytesLen);
+      window.crypto.getRandomValues(arr);
+      let binary = '';
+      for (let i = 0; i < arr.byteLength; i++) {
+        binary += String.fromCharCode(arr[i]);
+      }
+      return btoa(binary);
+    }
+
+    function generateRandomHeaders() {
+      const pool = [];
+      while (pool.length < 4) {
+        const val = randomInt(500000, 1800000000);
+        if (!pool.includes(val)) pool.push(val);
+      }
+      return pool;
+    }
+
     function fillParamsTemplate() {
       const textarea = document.getElementById('conn-manual-params');
+      const h = generateRandomHeaders();
+      const jc = randomInt(4, 7);
+      const jmin = randomInt(30, 60);
+      const jmax = randomInt(850, 1050);
+      const s1 = randomInt(40, 120);
+      const s2 = randomInt(35, 90);
+
       if (currentProtocol === '1.0') {
-        textarea.value = `Jc = 4\nJmin = 50\nJmax = 1000\nS1 = 120\nS2 = 50\nH1 = 691076\nH2 = 3050423\nH3 = 48076392\nH4 = 710707124`;
+        textarea.value = `Jc = ${jc}\nJmin = ${jmin}\nJmax = ${jmax}\nS1 = ${s1}\nS2 = ${s2}\nH1 = ${h[0]}\nH2 = ${h[1]}\nH3 = ${h[2]}\nH4 = ${h[3]}`;
       } else if (currentProtocol === '2.0') {
-        textarea.value = `Jc = 4\nJmin = 50\nJmax = 1000\nS1 = 120\nS2 = 50\nS3 = 30\nS4 = 25\nH1 = 691076\nH2 = 3050423\nH3 = 48076392\nH4 = 710707124`;
+        const h1_start = randomInt(1500000000, 1750000000);
+        const h1_end = h1_start + randomInt(50000000, 120000000);
+        const h2_start = randomInt(1850000000, 2050000000);
+        const h2_end = h2_start + randomInt(30000000, 80000000);
+        const h3_start = randomInt(2080000000, 2120000000);
+        const h3_end = h3_start + randomInt(10000000, 30000000);
+        const h4_start = randomInt(2130000000, 2145000000);
+        const h4_end = h4_start + randomInt(1000000, 2000000);
+
+        textarea.value = `Jc = ${jc}\nJmin = ${jmin}\nJmax = ${jmax}\nS1 = ${s1}\nS2 = ${s2}\nS3 = ${randomInt(15, 40)}\nS4 = ${randomInt(12, 30)}\nH1 = ${h1_start}-${h1_end}\nH2 = ${h2_start}-${h2_end}\nH3 = ${h3_start}-${h3_end}\nH4 = ${h4_start}-${h4_end}\nI1 = <r 2><b 0x858000010001000000000669636c6f756403636f6d0000010001c00c000100010000105a00044d583737>`;
       } else {
-        // AWG 3.1
-        textarea.value = `Jc = 4\nJmin = 50\nJmax = 1000\nS1 = 123\nS2 = 52\nS3 = 24\nS4 = 12\nH1 = 691076\nH2 = 3050423\nH3 = 48076392\nH4 = 710707124\nContentPaddingAddition = 10-100\nRekeyAfterTime = 100-120\nRekeyTimeout = 3-7\nRejectAfterTime = 150-180\nKeepaliveTimeout = 5-15\nMaxHandshakeAttempts = 15-20\nRandomTrailers = on`;
+        const hpk = randomBase64(32);
+        const padMin = randomInt(10, 25);
+        const padMax = randomInt(60, 110);
+        textarea.value = `Jc = ${jc}\nJmin = ${jmin}\nJmax = ${jmax}\nS1 = ${s1}\nS2 = ${s2}\nS3 = ${randomInt(20, 50)}\nS4 = ${randomInt(12, 28)}\nH1 = ${h[0]}\nH2 = ${h[1]}\nH3 = ${h[2]}\nH4 = ${h[3]}\nHeaderProtectionKey = ${hpk}\nContentPaddingAddition = ${padMin}-${padMax}\nRandomTrailers = on\nRekeyAfterTime = 100-120\nRekeyTimeout = 3-7\nRejectAfterTime = 150-180\nKeepaliveTimeout = 5-15\nMaxHandshakeAttempts = 15-20`;
       }
       onManualParamsInput();
     }
@@ -2372,8 +2413,13 @@
         }
 
         if (intKeys.has(lowerKey)) {
-          let num = parseInt(val, 10);
-          if (!isNaN(num)) params[canonicalKey] = num;
+          if (val.includes('-')) {
+            params[canonicalKey] = val;
+          } else {
+            let num = parseInt(val, 10);
+            if (!isNaN(num)) params[canonicalKey] = num;
+            else params[canonicalKey] = val;
+          }
         } else if (lowerKey === 'randomtrailers') {
           params[canonicalKey] = (val.toLowerCase() === 'on' || val === '1' || val.toLowerCase() === 'true') ? 1 : 0;
         } else {
@@ -2595,6 +2641,7 @@
         'Jc', 'Jmin', 'Jmax',
         'S1', 'S2', 'S3', 'S4',
         'H1', 'H2', 'H3', 'H4',
+        'I1', 'I2', 'I3', 'I4', 'I5',
         'HeaderProtectionKey', 'ContentPaddingAddition', 'RandomTrailers',
         'RekeyAfterTime', 'RekeyTimeout', 'RejectAfterTime', 'KeepaliveTimeout', 'MaxHandshakeAttempts'
       ];
