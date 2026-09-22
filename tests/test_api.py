@@ -395,6 +395,69 @@ class TestFastAPIEndpoints(unittest.TestCase):
             # Cleanup
             self.client.delete(f"/api/connections/{conn_id}")
 
+    def test_09_awg31_disable_cookies_and_collision_avoidance(self):
+        self.client.post("/api/auth/login", json={"username": "admin", "password": "password"})
+        # 1. Create first connection with specific table_num and fwmark and DisableCookies
+        payload1 = {
+            "name": "awg31test",
+            "protocol_version": "3.1",
+            "x_subnet": 83,
+            "listen_port": 51883,
+            "xray_port": 7083,
+            "table_num": 183,
+            "fwmark": 83,
+            "params": {
+                "Jc": 5, "Jmin": 10, "Jmax": 50,
+                "S1": 29, "S2": 124, "S3": 53, "S4": 12,
+                "H1": 1, "H2": 2, "H3": 3, "H4": 4,
+                "HeaderProtectionKey": "o2Ehz+5lWgG6rWnApvby6XyWAc94zYEK99iqDiWS6fQ=",
+                "ContentPaddingAddition": "10-100",
+                "RekeyAfterTime": "100-120",
+                "RekeyTimeout": "3-7",
+                "RejectAfterTime": "150-180",
+                "KeepaliveTimeout": "5-15",
+                "MaxHandshakeAttempts": "15-20",
+                "RandomTrailers": "on",
+                "DisableCookies": "on",
+            }
+        }
+        res1 = self.client.post("/api/connections", json=payload1)
+        self.assertEqual(res1.status_code, 200)
+        c1_id = res1.json()["id"]
+
+        try:
+            # Verify DisableCookies is in config
+            conf1 = self.client.get(f"/api/connections/{c1_id}/config")
+            self.assertEqual(conf1.status_code, 200)
+            self.assertIn("DisableCookies = on", conf1.text)
+            self.assertIn("RandomTrailers = on", conf1.text)
+            self.assertIn("HeaderProtectionKey = o2Ehz+5lWgG6rWnApvby6XyWAc94zYEK99iqDiWS6fQ=", conf1.text)
+
+            # 2. Attempt to create second connection with SAME table_num and fwmark
+            payload2 = {
+                "name": "awg31dup",
+                "protocol_version": "3.1",
+                "x_subnet": 84,
+                "listen_port": 51884,
+                "xray_port": 7084,
+                "table_num": 183, # same as c1!
+                "fwmark": 83,    # same as c1!
+                "params": payload1["params"],
+            }
+            res2 = self.client.post("/api/connections", json=payload2)
+            self.assertEqual(res2.status_code, 200)
+            c2_id = res2.json()["id"]
+
+            try:
+                # Check that c2 received a different table_num and fwmark automatically
+                status2 = self.client.get(f"/api/connections/{c2_id}/status").json()
+                self.assertNotEqual(status2["table_num"], 183)
+                self.assertNotEqual(status2["fwmark"], 83)
+            finally:
+                self.client.delete(f"/api/connections/{c2_id}")
+        finally:
+            self.client.delete(f"/api/connections/{c1_id}")
+
 if __name__ == "__main__":
     unittest.main()
 

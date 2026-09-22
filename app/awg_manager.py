@@ -68,6 +68,9 @@ def build_awg_params_block(params: Dict[str, Any]) -> List[str]:
         if "RandomTrailers" in params and params["RandomTrailers"]:
             rt_val = params['RandomTrailers']
             lines.append(f"RandomTrailers = {'on' if str(rt_val).lower() in ('1', 'true', 'on') else rt_val}")
+        if "DisableCookies" in params and params["DisableCookies"]:
+            dc_val = params['DisableCookies']
+            lines.append(f"DisableCookies = {'on' if str(dc_val).lower() in ('1', 'true', 'on') else dc_val}")
         for key in ("RekeyAfterTime", "RekeyTimeout", "RejectAfterTime", "KeepaliveTimeout", "MaxHandshakeAttempts"):
             if key in params and params[key] is not None:
                 lines.append(f"{key} = {params[key]}")
@@ -288,7 +291,7 @@ def generate_amnezia_vpn_data(peer_id: int) -> Tuple[Dict[str, Any], str]:
     if peer.get("preshared_key"):
         awg_container_data["preshared_key"] = peer["preshared_key"]
 
-    for k in ["Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4", "I1", "I2", "I3", "HeaderProtectionKey"]:
+    for k in ["Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4", "I1", "I2", "I3", "HeaderProtectionKey", "ContentPaddingAddition", "RandomTrailers", "DisableCookies"]:
         if k in params and params[k] is not None:
             awg_container_data[k] = str(params[k])
 

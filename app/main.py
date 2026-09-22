@@ -3,6 +3,7 @@ import logging
 import os
 import platform
 import shutil
+import sqlite3
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -47,6 +48,7 @@ from app.awg_manager import (
     write_server_config,
 )
 from app.config import (
+    AWG_DIR,
     BASE_DIR,
     DEFAULT_DNS,
     DEFAULT_MTU,
@@ -54,6 +56,7 @@ from app.config import (
 )
 from app.database import (
     create_connection,
+    get_db,
     create_peer,
     create_server,
     create_user,
@@ -577,11 +580,45 @@ async def api_create_connection(req: CreateConnectionRequest, request: Request):
     if get_connection_by_name(name):
         raise HTTPException(status_code=400, detail=f"Подключение {name} уже существует")
 
-    # Table and mark auto calculation if not provided
+    # Check collisions and auto-increment index_num, table_num, fwmark
+    with get_db() as db:
+        used_indices = {row[0] for row in db.execute("SELECT index_num FROM connections").fetchall()}
+        used_tables = {row[0] for row in db.execute("SELECT table_num FROM connections").fetchall()}
+        used_marks = {row[0] for row in db.execute("SELECT fwmark FROM connections").fetchall()}
+        used_ports = {row[0] for row in db.execute("SELECT listen_port FROM connections WHERE server_id = ?", (req.server_id,)).fetchall()}
+        used_subnets = {row[0] for row in db.execute("SELECT x_subnet FROM connections WHERE server_id = ?", (req.server_id,)).fetchall()}
+
+    while next_idx in used_indices:
+        next_idx += 1
+
+    # Table and mark auto calculation if not provided or collision
     next_tbl, next_mrk = get_next_table_and_mark()
     table_num = req.table_num if req.table_num is not None else next_tbl
+    if table_num in used_tables:
+        t = max(used_tables) + 1 if used_tables else 101
+        while t in used_tables:
+            t += 1
+        table_num = t
+
     fwmark = req.fwmark if req.fwmark is not None else next_mrk
+    if fwmark in used_marks:
+        m = max(used_marks) + 1 if used_marks else 1
+        while m in used_marks:
+            m += 1
+        fwmark = m
+
     listen_port = req.listen_port if req.listen_port is not None else get_next_listen_port()
+    if listen_port in used_ports:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Порт {listen_port} уже занят другим подключением на этом сервере. Укажите другой порт."
+        )
+
+    if req.x_subnet in used_subnets:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Подсеть 10.{req.x_subnet}.0.0/16 уже занята другим подключением на этом сервере. Выберите другую подсеть."
+        )
 
     # Protocol parameters: use manual params if provided, otherwise generate
     if req.params:
@@ -601,6 +638,10 @@ async def api_create_connection(req: CreateConnectionRequest, request: Request):
         if "RandomTrailers" in params:
             rt = str(params["RandomTrailers"]).lower()
             params["RandomTrailers"] = 1 if rt in ("1", "true", "on", "yes") else 0
+        # DisableCookies normalization
+        if "DisableCookies" in params:
+            dc = str(params["DisableCookies"]).lower()
+            params["DisableCookies"] = 1 if dc in ("1", "true", "on", "yes") else 0
         # If AWG 3.1 and HeaderProtectionKey is missing, auto-generate it
         if req.protocol_version in ("3.0", "3.1") and not params.get("HeaderProtectionKey"):
             from app.awg_crypto import generate_header_protection_key
@@ -612,20 +653,23 @@ async def api_create_connection(req: CreateConnectionRequest, request: Request):
     # Keys
     priv, pub = generate_keypair()
 
-    conn_id = create_connection(
-        name=name,
-        index_num=next_idx,
-        protocol_version=req.protocol_version,
-        x_subnet=req.x_subnet,
-        listen_port=listen_port,
-        server_private_key=priv,
-        server_public_key=pub,
-        xray_port=req.xray_port,
-        table_num=table_num,
-        fwmark=fwmark,
-        params=params,
-        server_id=req.server_id,
-    )
+    try:
+        conn_id = create_connection(
+            name=name,
+            index_num=next_idx,
+            protocol_version=req.protocol_version,
+            x_subnet=req.x_subnet,
+            listen_port=listen_port,
+            server_private_key=priv,
+            server_public_key=pub,
+            xray_port=req.xray_port,
+            table_num=table_num,
+            fwmark=fwmark,
+            params=params,
+            server_id=req.server_id,
+        )
+    except sqlite3.IntegrityError as e:
+        raise HTTPException(status_code=400, detail=f"Ошибка базы данных при создании подключения: {e}")
 
     # Write config file and symlink
     write_server_config(conn_id)
@@ -645,8 +689,8 @@ async def api_get_connection_status(conn_id: int, request: Request):
 @app.post("/api/connections/{conn_id}/start")
 async def api_start_connection(conn_id: int, request: Request):
     require_admin(request)
-    ok, msg = start_connection(conn_id)
-    if not ok:
+    success, msg = start_connection(conn_id)
+    if not success:
         raise HTTPException(status_code=500, detail=msg)
     return {"status": "success", "message": msg}
 
@@ -654,8 +698,8 @@ async def api_start_connection(conn_id: int, request: Request):
 @app.post("/api/connections/{conn_id}/stop")
 async def api_stop_connection(conn_id: int, request: Request):
     require_admin(request)
-    ok, msg = stop_connection(conn_id)
-    if not ok:
+    success, msg = stop_connection(conn_id)
+    if not success:
         raise HTTPException(status_code=500, detail=msg)
     return {"status": "success", "message": msg}
 
@@ -663,8 +707,8 @@ async def api_stop_connection(conn_id: int, request: Request):
 @app.post("/api/connections/{conn_id}/restart")
 async def api_restart_connection(conn_id: int, request: Request):
     require_admin(request)
-    ok, msg = restart_connection(conn_id)
-    if not ok:
+    success, msg = restart_connection(conn_id)
+    if not success:
         raise HTTPException(status_code=500, detail=msg)
     return {"status": "success", "message": msg}
 
@@ -678,6 +722,12 @@ async def api_update_connection(conn_id: int, req: UpdateConnectionRequest, requ
 
     listen_port = req.listen_port if req.listen_port is not None else conn["listen_port"]
     proto = req.protocol_version or conn.get("protocol_version", "1.0")
+
+    if listen_port != conn["listen_port"]:
+        with get_db() as db:
+            used_ports = {row[0] for row in db.execute("SELECT listen_port FROM connections WHERE server_id = ? AND id != ?", (conn.get("server_id", 1), conn_id)).fetchall()}
+        if listen_port in used_ports:
+            raise HTTPException(status_code=400, detail=f"Порт {listen_port} уже занят другим подключением на этом сервере")
 
     current_params = dict(conn.get("params", {}))
     if req.params is not None:
@@ -697,6 +747,10 @@ async def api_update_connection(conn_id: int, req: UpdateConnectionRequest, requ
         if "RandomTrailers" in new_params:
             rt = str(new_params["RandomTrailers"]).lower()
             new_params["RandomTrailers"] = 1 if rt in ("1", "true", "on", "yes") else 0
+        # DisableCookies normalization
+        if "DisableCookies" in new_params:
+            dc = str(new_params["DisableCookies"]).lower()
+            new_params["DisableCookies"] = 1 if dc in ("1", "true", "on", "yes") else 0
 
         new_params["protocol_version"] = proto
 
@@ -710,7 +764,10 @@ async def api_update_connection(conn_id: int, req: UpdateConnectionRequest, requ
         current_params["protocol_version"] = proto
 
     # Update in database
-    update_connection_params(conn_id, current_params, listen_port=listen_port, protocol_version=proto)
+    try:
+        update_connection_params(conn_id, current_params, listen_port=listen_port, protocol_version=proto)
+    except sqlite3.IntegrityError as e:
+        raise HTTPException(status_code=400, detail=f"Ошибка базы данных при обновлении параметров: {e}")
 
     # Re-write server config file
     write_server_config(conn_id)
