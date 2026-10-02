@@ -195,6 +195,37 @@ def write_server_config(conn_id: int) -> Path:
     return conf_file
 
 
+def get_connection_dns_config(conn: Dict[str, Any]) -> Tuple[str, str, str]:
+    """
+    Returns (dns_conf_str, dns1, dns2) for a client connection.
+    Primary DNS (dns1) is always 10.{x_subnet}.0.1 (interface gateway where AdGuard Home intercepts DNS).
+    Secondary DNS (dns2) comes from the default_dns setting (if specified).
+    """
+    x_subnet = conn.get("x_subnet", 10)
+    primary_dns = f"10.{x_subnet}.0.1"
+
+    raw_dns = get_setting("default_dns", "1.1.1.1, 8.8.8.8") or ""
+    raw_dns = raw_dns.strip()
+
+    parts = []
+    if raw_dns:
+        for p in raw_dns.split(","):
+            p = p.strip()
+            if not p:
+                continue
+            if p == "10.x.0.1":
+                p = primary_dns
+            if p not in parts and p != primary_dns:
+                parts.append(p)
+
+    all_dns = [primary_dns] + parts
+    dns_conf_str = ", ".join(all_dns)
+    dns1 = primary_dns
+    dns2 = parts[0] if parts else primary_dns
+
+    return dns_conf_str, dns1, dns2
+
+
 def generate_client_config_text(peer_id: int) -> str:
     """Generates the client .conf file for a peer."""
     peer = get_peer_by_id(peer_id)
@@ -213,7 +244,7 @@ def generate_client_config_text(peer_id: int) -> str:
     if not server_host:
         server_host = "YOUR_SERVER_IP"
 
-    dns = get_setting("default_dns", "1.1.1.1, 8.8.8.8")
+    dns_conf_str, _, _ = get_connection_dns_config(conn)
     mtu = get_setting("default_mtu", "1200")
 
     params = conn["params"]
@@ -227,7 +258,7 @@ def generate_client_config_text(peer_id: int) -> str:
         "[Interface]",
         f"PrivateKey = {peer['client_private_key']}",
         f"Address = {peer['client_ip']}/32",
-        f"DNS = {dns}",
+        f"DNS = {dns_conf_str}",
     ]
     if mtu:
         lines.append(f"MTU = {mtu}")
@@ -270,10 +301,7 @@ def generate_amnezia_vpn_data(peer_id: int) -> Tuple[Dict[str, Any], str]:
         server_host = "YOUR_SERVER_IP"
 
     server_name = server["name"] if server and server.get("name") else "Server"
-    dns = get_setting("default_dns", "1.1.1.1, 8.8.8.8")
-    dns_parts = [d.strip() for d in dns.split(",") if d.strip()]
-    dns1 = dns_parts[0] if len(dns_parts) > 0 else "1.1.1.1"
-    dns2 = dns_parts[1] if len(dns_parts) > 1 else "8.8.8.8"
+    _, dns1, dns2 = get_connection_dns_config(conn)
     mtu = get_setting("default_mtu", "1200")
 
     params = conn["params"]

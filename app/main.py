@@ -35,6 +35,7 @@ from app.awg_manager import (
     generate_amnezia_vpn_data,
     generate_client_config_text,
     generate_server_config_text,
+    get_connection_dns_config,
     get_interface_conf_file,
     get_interface_detailed_status,
     get_interface_live_status,
@@ -1592,8 +1593,10 @@ async def serve_subscription(token: str, request: Request, format: Optional[str]
             params = conn.get("params", {})
             tag = f"{server.get('name', 'Server')}_{conn.get('name', 'AWG')}".replace(" ", "_")
 
+            dns_conf_str, _, _ = get_connection_dns_config(conn)
             query_parts = [
                 f"address={p['client_ip']}/32",
+                f"dns={dns_conf_str}",
                 f"publickey={conn.get('server_public_key', '')}",
             ]
             if p.get("preshared_key"):

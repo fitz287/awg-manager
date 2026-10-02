@@ -458,6 +458,54 @@ class TestFastAPIEndpoints(unittest.TestCase):
         finally:
             self.client.delete(f"/api/connections/{c1_id}")
 
+    def test_10_primary_dns_agh(self):
+        self.client.post("/api/auth/login", json={"username": "admin", "password": "password"})
+        from app.awg_manager import generate_client_config_text, generate_amnezia_vpn_data
+
+        # Create connection with x_subnet = 64
+        conn_res = self.client.post("/api/connections", json={
+            "name": "awg64dns",
+            "protocol_version": "1.0",
+            "x_subnet": 64,
+            "listen_port": 51864,
+            "xray_port": 7064,
+        })
+        self.assertEqual(conn_res.status_code, 200)
+        conn_id = conn_res.json()["id"]
+
+        try:
+            # Create user
+            u_res = self.client.post("/api/users", json={
+                "connection_id": conn_id,
+                "username": "dnsuser",
+            })
+            self.assertEqual(u_res.status_code, 200)
+            user_id = u_res.json()["user_id"]
+
+            # Create peer
+            p_res = self.client.post("/api/peers", json={
+                "connection_id": conn_id,
+                "user_id": user_id,
+                "label": "Phone",
+            })
+            self.assertEqual(p_res.status_code, 200)
+            peer_id = p_res.json()["peer_id"]
+
+            # Check .conf has 10.64.0.1 as primary DNS
+            conf_text = generate_client_config_text(peer_id)
+            self.assertIn("DNS = 10.64.0.1", conf_text)
+
+            # Check Amnezia VPN container has dns1 = 10.64.0.1
+            vpn_dict, vpn_url = generate_amnezia_vpn_data(peer_id)
+            self.assertEqual(vpn_dict["dns1"], "10.64.0.1")
+
+            # Check API download
+            api_conf = self.client.get(f"/api/peers/{peer_id}/config")
+            self.assertEqual(api_conf.status_code, 200)
+            self.assertIn("DNS = 10.64.0.1", api_conf.text)
+        finally:
+            self.client.delete(f"/api/connections/{conn_id}")
+
 if __name__ == "__main__":
     unittest.main()
 
