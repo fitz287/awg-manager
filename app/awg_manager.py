@@ -29,9 +29,6 @@ def is_local_server(server: Optional[Dict[str, Any]]) -> bool:
     host = (server.get("host") or "").strip()
     if not host or host in ("127.0.0.1", "localhost", "0.0.0.0", "46.229.212.225"):
         return True
-    saved_host = get_setting("server_host", "").strip()
-    if saved_host and host == saved_host:
-        return True
     return False
 
 
