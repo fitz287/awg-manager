@@ -26,8 +26,9 @@ from app.awg_crypto import encode_amnezia_vpn_url
 def is_local_server(server: Optional[Dict[str, Any]]) -> bool:
     if not server:
         return True
-    host = (server.get("host") or "").strip()
-    if not host or host in ("127.0.0.1", "localhost", "0.0.0.0", "46.229.212.225"):
+    host = (server.get("host") or "").strip().lower()
+    server_host = (get_setting("server_host", "") or "").strip().lower()
+    if not host or host in ("127.0.0.1", "localhost", "0.0.0.0") or (server_host and host == server_host):
         return True
     return False
 
