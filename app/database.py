@@ -25,6 +25,7 @@ def get_db():
 
 def init_db():
     with get_db() as conn:
+        conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript("""
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,

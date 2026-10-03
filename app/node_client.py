@@ -11,7 +11,7 @@ logger = logging.getLogger("node_client")
 
 
 class NodeClient:
-    def __init__(self, server: Dict[str, Any], timeout: float = 8.0):
+    def __init__(self, server: Dict[str, Any], timeout: float = 2.0):
         self.server_id = server.get("id")
         self.host = server.get("host", "").strip()
         self.port = server.get("api_port", 8089)

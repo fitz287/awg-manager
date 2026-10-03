@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -412,13 +413,13 @@ async def serve_index(request: Request):
 async def api_list_servers(request: Request):
     require_admin(request)
     servers = get_all_servers()
-    for s in servers:
-        # Never override status while provisioning is in progress
+
+    async def _check_srv(s):
         if s.get("status") in ("installing", "pending"):
-            continue
+            return
         try:
             client = NodeClient(s, timeout=1.5)
-            health = client.health()
+            health = await asyncio.to_thread(client.health)
             if health.get("status") == "ok":
                 s["status"] = "online"
                 update_server_status(s["id"], "online")
@@ -427,6 +428,8 @@ async def api_list_servers(request: Request):
                 update_server_status(s["id"], "offline")
         except Exception:
             pass
+
+    await asyncio.gather(*(_check_srv(s) for s in servers))
     return servers
 
 
@@ -497,8 +500,8 @@ async def api_get_server_metrics(server_id: int, request: Request):
     if not server:
         raise HTTPException(status_code=404, detail="Сервер не найден")
 
-    client = NodeClient(server)
-    metrics = client.get_metrics()
+    client = NodeClient(server, timeout=2.0)
+    metrics = await asyncio.to_thread(client.get_metrics)
     if "error" not in metrics:
         update_server_system_info(server_id, metrics)
     return metrics
@@ -528,9 +531,14 @@ async def api_delete_server(server_id: int, request: Request):
 async def list_connections(request: Request):
     require_admin(request)
     conns = get_all_connections()
-    for c in conns:
-        live = get_interface_live_status(c["id"])
-        c["live"] = live
+
+    async def _fetch_live(c):
+        try:
+            c["live"] = await asyncio.to_thread(get_interface_live_status, c["id"])
+        except Exception:
+            c["live"] = {"status": "stopped", "is_running": False}
+
+    await asyncio.gather(*(_fetch_live(c) for c in conns))
     return conns
 
 
@@ -681,7 +689,7 @@ async def api_create_connection(req: CreateConnectionRequest, request: Request):
 @app.get("/api/connections/{conn_id}/status")
 async def api_get_connection_status(conn_id: int, request: Request):
     require_admin(request)
-    status_data = get_interface_detailed_status(conn_id)
+    status_data = await asyncio.to_thread(get_interface_detailed_status, conn_id)
     if status_data.get("status") == "error":
         raise HTTPException(status_code=404, detail=status_data.get("detail", "Подключение не найдено"))
     return status_data

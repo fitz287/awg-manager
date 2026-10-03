@@ -23,6 +23,18 @@ from app.awg_crypto import encode_amnezia_vpn_url
 
 
 
+def is_local_server(server: Optional[Dict[str, Any]]) -> bool:
+    if not server:
+        return True
+    host = (server.get("host") or "").strip()
+    if not host or host in ("127.0.0.1", "localhost", "0.0.0.0", "46.229.212.225"):
+        return True
+    saved_host = get_setting("server_host", "").strip()
+    if saved_host and host == saved_host:
+        return True
+    return False
+
+
 def get_interface_dir(name: str) -> Path:
     """Returns directory path: /etc/amnezia/amneziawg/{name}/"""
     return AWG_DIR / name
@@ -377,7 +389,8 @@ def start_connection(conn_id: int) -> Tuple[bool, str]:
 
     # Try node agent if server is configured
     if server and server.get("host"):
-        client = NodeClient(server)
+        target_server = {**server, "host": "127.0.0.1"} if is_local_server(server) else server
+        client = NodeClient(target_server, timeout=4.0)
         conf_text = generate_server_config_text(conn_id)
         try:
             mtu_val = int(get_setting("default_mtu", "1200"))
@@ -437,7 +450,8 @@ def stop_connection(conn_id: int) -> Tuple[bool, str]:
     server = get_server_by_id(conn.get("server_id", 1))
 
     if server and server.get("host"):
-        client = NodeClient(server)
+        target_server = {**server, "host": "127.0.0.1"} if is_local_server(server) else server
+        client = NodeClient(target_server, timeout=4.0)
         res = client.stop_interface(name)
         if res.get("status") == "success":
             update_connection_status(conn_id, False)
@@ -534,8 +548,8 @@ def get_interface_live_status(conn_id: int) -> Dict[str, Any]:
     name = conn["name"]
     server = get_server_by_id(conn.get("server_id", 1))
 
-    if server and server.get("host") and server.get("id") != 1:
-        client = NodeClient(server)
+    if server and server.get("host") and not is_local_server(server):
+        client = NodeClient(server, timeout=2.0)
         stats = client.get_interface_stats(name)
         if stats.get("is_running"):
             update_connection_status(conn_id, True)
@@ -550,6 +564,16 @@ def get_interface_live_status(conn_id: int) -> Dict[str, Any]:
                 "tx_bytes": fmt_bytes(tx_bytes),
                 "last_handshake": "Активен",
                 "peers_connected": peer_count,
+            }
+        else:
+            update_connection_status(conn_id, False)
+            return {
+                "status": "stopped",
+                "is_running": False,
+                "rx_bytes": "0 B",
+                "tx_bytes": "0 B",
+                "last_handshake": "—",
+                "peers_connected": 0,
             }
 
     if not IS_LINUX:
@@ -642,8 +666,8 @@ def get_interface_detailed_status(conn_id: int) -> Dict[str, Any]:
     tx_bytes = 0
 
     # 1. Check remote node
-    if server and server.get("host") and server.get("id") != 1:
-        client = NodeClient(server)
+    if server and server.get("host") and not is_local_server(server):
+        client = NodeClient(server, timeout=2.0)
         stats = client.get_interface_stats(name)
         is_running = stats.get("is_running", False)
         rx_bytes = stats.get("rx_bytes", 0)
@@ -780,7 +804,8 @@ def sync_connection_peers(conn_id: int) -> Tuple[bool, str]:
 
     server = get_server_by_id(conn.get("server_id", 1))
     if server and server.get("host"):
-        client = NodeClient(server)
+        target_server = {**server, "host": "127.0.0.1"} if is_local_server(server) else server
+        client = NodeClient(target_server, timeout=4.0)
         conf_text = generate_server_config_text(conn_id)
         mtu = int(get_setting("default_mtu", "1200"))
         res = client.sync_interface(
@@ -820,7 +845,8 @@ def sync_peer_to_node(peer_id: int) -> Tuple[bool, str]:
 
     server = get_server_by_id(conn.get("server_id", 1))
     if server and server.get("host"):
-        client = NodeClient(server)
+        target_server = {**server, "host": "127.0.0.1"} if is_local_server(server) else server
+        client = NodeClient(target_server, timeout=4.0)
         res = client.sync_peer(
             interface=conn["name"],
             public_key=peer["client_public_key"],
@@ -845,7 +871,8 @@ def remove_peer_from_node(peer_id: int) -> Tuple[bool, str]:
 
     server = get_server_by_id(conn.get("server_id", 1))
     if server and server.get("host"):
-        client = NodeClient(server)
+        target_server = {**server, "host": "127.0.0.1"} if is_local_server(server) else server
+        client = NodeClient(target_server, timeout=4.0)
         res = client.remove_peer(
             interface=conn["name"],
             public_key=peer["client_public_key"],
