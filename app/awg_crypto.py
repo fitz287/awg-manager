@@ -99,11 +99,139 @@ def generate_unique_s_params() -> Tuple[int, int, int, int]:
     return s_list[0], s_list[1], s_list[2], s4
 
 
-def generate_awg_params(protocol_version: str) -> Dict[str, Any]:
+def generate_awg_h_ranges() -> Tuple[str, str, str, str]:
+    """
+    Generates 4 disjoint non-overlapping uint32 ranges as in bivlked amneziawg-installer.
+    Algorithm: 8 random numbers sorted into 4 pairs with >= 1000 span and strictly non-overlapping.
+    """
+    for _ in range(50):
+        nums = sorted(secrets.randbelow(1_900_000_000) + 100_000 for _ in range(8))
+        if (
+            nums[0] >= 5
+            and nums[1] - nums[0] >= 1000
+            and nums[3] - nums[2] >= 1000
+            and nums[5] - nums[4] >= 1000
+            and nums[7] - nums[6] >= 1000
+            and nums[2] > nums[1]
+            and nums[4] > nums[3]
+            and nums[6] > nums[5]
+        ):
+            return (
+                f"{nums[0]}-{nums[1]}",
+                f"{nums[2]}-{nums[3]}",
+                f"{nums[4]}-{nums[5]}",
+                f"{nums[6]}-{nums[7]}",
+            )
+    return (
+        "1776002204-1856261239",
+        "2131483220-2139616315",
+        "2145540006-2146234083",
+        "2146328963-2146998719",
+    )
+
+
+def generate_cps_dns_i1() -> str:
+    """
+    Generates DNS-shaped CPS concealment string for I1 conforming to bivlked amneziawg-installer:
+    Mimics Apple iCloud DNS query response pattern for active probing bypass.
+    """
+    return "<r 2><b 0x858000010001000000000669636c6f756403636f6d0000010001c00c000100010000105a00044d583737>"
+
+
+def generate_bivlked_mobile_params(protocol_version: str) -> Dict[str, Any]:
+    """
+    Generates AmneziaWG obfuscation parameters corresponding to
+    bivlked/amneziawg-installer with --mobile flag:
+    - Jc = 3 (fixed: Tele2, Yota, Megafon, MTS >95% pass rate)
+    - Jmin = 30..50
+    - Jmax = Jmin + 20..80 (narrow junk window avoids DPI fragmentation & drop)
+    - S1 = 15..150
+    - S2 = 15..150 (ensuring S1 + 56 != S2)
+    - S3 = 12..55 (for 3.1) or 8..55 (for 2.0) (ensuring S2 + 28 != S3)
+    - S4 = 12..27 (for 3.1) or 4..27 (for 2.0)
+    - H1..H4: 1, 2, 3, 4 for AWG 3.1; 4 non-overlapping ranges for AWG 2.0
+    - I1: DNS-shaped CPS packet
+    - AWG 3.1: HeaderProtectionKey, ContentPaddingAddition 32-128, RandomTrailers on, safe timers
+    """
+    version = protocol_version.strip().lower()
+    jc = 3
+    jmin = random.randint(30, 50)
+    jmax = jmin + random.randint(20, 80)
+
+    s1 = random.randint(15, 150)
+    s2 = random.randint(15, 150)
+    while s1 + 56 == s2:
+        s2 = random.randint(15, 150)
+
+    is_v3 = version in ("3.1", "3.0", "awg 3.1", "awg 3.0", "v3", "3")
+    is_v2 = version in ("2.0", "awg 2.0", "v2", "2")
+
+    s3_min = 12 if is_v3 else 8
+    s4_min = 12 if is_v3 else 4
+
+    s3 = random.randint(s3_min, 55)
+    while s2 + 28 == s3:
+        s3 = random.randint(s3_min, 55)
+
+    s4 = random.randint(s4_min, 27)
+
+    params: Dict[str, Any] = {
+        "Jc": jc,
+        "Jmin": jmin,
+        "Jmax": jmax,
+        "S1": s1,
+        "S2": s2,
+    }
+
+    if is_v3:
+        params["protocol_version"] = "3.1"
+        params["S3"] = s3
+        params["S4"] = s4
+        params["H1"] = 1
+        params["H2"] = 2
+        params["H3"] = 3
+        params["H4"] = 4
+        params["HeaderProtectionKey"] = generate_header_protection_key()
+        cpa_min = random.randint(32, 48)
+        cpa_max = random.randint(70, 128)
+        params["ContentPaddingAddition"] = f"{cpa_min}-{cpa_max}"
+        params["RandomTrailers"] = 1
+        params["RekeyAfterTime"] = "100-120"
+        params["RekeyTimeout"] = "3-7"
+        params["RejectAfterTime"] = "150-180"
+        params["KeepaliveTimeout"] = "5-15"
+        params["MaxHandshakeAttempts"] = "15-20"
+        params["I1"] = generate_cps_dns_i1()
+    elif is_v2:
+        params["protocol_version"] = "2.0"
+        params["S3"] = s3
+        params["S4"] = s4
+        h1, h2, h3, h4 = generate_awg_h_ranges()
+        params["H1"] = h1
+        params["H2"] = h2
+        params["H3"] = h3
+        params["H4"] = h4
+        params["I1"] = generate_cps_dns_i1()
+    else:
+        params["protocol_version"] = "1.0"
+        h = generate_unique_headers(4)
+        params["H1"] = h[0]
+        params["H2"] = h[1]
+        params["H3"] = h[2]
+        params["H4"] = h[3]
+
+    return params
+
+
+def generate_awg_params(protocol_version: str, preset: str = "default") -> Dict[str, Any]:
     """
     Generates protocol-specific parameters for AWG 1.0, 2.0, 3.1
     with realistic, complex obfuscation parameters.
+    Supports preset='default' or preset='mobile' (as in bivlked amneziawg-installer --mobile).
     """
+    if str(preset).strip().lower() == "mobile":
+        return generate_bivlked_mobile_params(protocol_version)
+
     version = protocol_version.strip().lower()
 
     if version in ("1.0", "awg 1.0", "v1", "1"):
@@ -123,8 +251,8 @@ def generate_awg_params(protocol_version: str) -> Dict[str, Any]:
         }
 
     elif version in ("2.0", "awg 2.0", "v2", "2"):
-        h = generate_unique_headers(4)
         s1, s2, s3, s4 = generate_unique_s_params()
+        h1, h2, h3, h4 = generate_awg_h_ranges()
         return {
             "protocol_version": "2.0",
             "Jc": random.randint(3, 6),
@@ -134,18 +262,19 @@ def generate_awg_params(protocol_version: str) -> Dict[str, Any]:
             "S2": s2,
             "S3": s3,
             "S4": s4,
-            "H1": h[0],
-            "H2": h[1],
-            "H3": h[2],
-            "H4": h[3],
+            "H1": h1,
+            "H2": h2,
+            "H3": h3,
+            "H4": h4,
+            "I1": generate_cps_dns_i1(),
         }
 
     elif version in ("3.1", "3.0", "awg 3.1", "awg 3.0", "v3", "3"):
-        h = generate_unique_headers(4)
         s1, s2, s3, s4 = generate_unique_s_params()
+        h = generate_unique_headers(4)
         hpk = generate_header_protection_key()
-        pad_min = random.randint(8, 20)
-        pad_max = random.randint(45, 95)
+        pad_min = random.randint(10, 25)
+        pad_max = random.randint(60, 110)
         return {
             "protocol_version": "3.1",
             "HeaderProtectionKey": hpk,
@@ -156,7 +285,7 @@ def generate_awg_params(protocol_version: str) -> Dict[str, Any]:
             "RejectAfterTime": "150-180",
             "KeepaliveTimeout": "5-15",
             "MaxHandshakeAttempts": "15-20",
-            "Jc": random.randint(3, 6),
+            "Jc": random.randint(4, 6),
             "Jmin": random.randint(40, 60),
             "Jmax": random.randint(850, 1100),
             "S1": s1,
@@ -167,11 +296,12 @@ def generate_awg_params(protocol_version: str) -> Dict[str, Any]:
             "H2": h[1],
             "H3": h[2],
             "H4": h[3],
+            "I1": generate_cps_dns_i1(),
         }
 
     else:
         # Default fallback to 1.0
-        return generate_awg_params("1.0")
+        return generate_awg_params("1.0", preset=preset)
 
 
 def encode_amnezia_vpn_url(vpn_dict: Dict[str, Any]) -> str:

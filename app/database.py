@@ -63,6 +63,7 @@ def init_db():
             table_num INTEGER UNIQUE NOT NULL,     -- e.g. 101, 102
             fwmark INTEGER UNIQUE NOT NULL,        -- e.g. 1, 2, 3
             params_json TEXT NOT NULL,             -- Jc, Jmin, S1, H1..
+            enable_xray INTEGER DEFAULT 1,         -- 1 = route to Xray TProxy table, 0 = direct NAT
             is_active INTEGER DEFAULT 0,
             created_at TEXT NOT NULL
         );
@@ -147,10 +148,12 @@ def init_db():
             import secrets
             conn.execute("UPDATE users SET subscription_token = ? WHERE id = ?", (secrets.token_urlsafe(16), u["id"]))
 
-        # Auto-migrate connections table if server_id is missing
+        # Auto-migrate connections table if server_id or enable_xray is missing
         conn_cols = [col["name"] for col in conn.execute("PRAGMA table_info(connections)").fetchall()]
         if "server_id" not in conn_cols:
             conn.execute("ALTER TABLE connections ADD COLUMN server_id INTEGER DEFAULT 1")
+        if "enable_xray" not in conn_cols:
+            conn.execute("ALTER TABLE connections ADD COLUMN enable_xray INTEGER DEFAULT 1")
 
         # Default settings
         cur = conn.cursor()
@@ -443,6 +446,7 @@ def create_connection(
     fwmark: int,
     params: Dict[str, Any],
     server_id: int = 1,
+    enable_xray: bool = True,
 ) -> int:
     with get_db() as conn:
         cur = conn.cursor()
@@ -451,8 +455,8 @@ def create_connection(
             INSERT INTO connections (
                 server_id, name, index_num, protocol_version, x_subnet, listen_port,
                 server_private_key, server_public_key, xray_port, table_num,
-                fwmark, params_json, is_active, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+                fwmark, params_json, enable_xray, is_active, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
             """,
             (
                 server_id,
@@ -467,6 +471,7 @@ def create_connection(
                 table_num,
                 fwmark,
                 json.dumps(params),
+                1 if enable_xray else 0,
                 datetime.now(timezone.utc).isoformat(),
             ),
         )
@@ -483,6 +488,7 @@ def update_connection_params(
     params: Dict[str, Any],
     listen_port: Optional[int] = None,
     protocol_version: Optional[str] = None,
+    enable_xray: Optional[bool] = None,
 ) -> bool:
     with get_db() as conn:
         updates = ["params_json = ?"]
@@ -493,6 +499,9 @@ def update_connection_params(
         if protocol_version is not None:
             updates.append("protocol_version = ?")
             vals.append(protocol_version)
+        if enable_xray is not None:
+            updates.append("enable_xray = ?")
+            vals.append(1 if enable_xray else 0)
         vals.append(conn_id)
         sql = f"UPDATE connections SET {', '.join(updates)} WHERE id = ?"
         conn.execute(sql, tuple(vals))

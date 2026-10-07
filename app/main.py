@@ -187,17 +187,20 @@ class CreateConnectionRequest(BaseModel):
     server_id: int = 1
     name: Optional[str] = None  # e.g. awg1, auto-generated if empty
     protocol_version: str = "1.0"  # "1.0", "2.0", "3.1"
+    preset: str = "default"  # "default" or "mobile"
     x_subnet: int = Field(..., ge=1, le=254, description="x in 10.x.0.0/16")
     listen_port: Optional[int] = None
     xray_port: int = 7010
     table_num: Optional[int] = None
     fwmark: Optional[int] = None
+    enable_xray: bool = True  # whether to create table & routing for Xray TProxy
     params: Optional[Dict[str, Any]] = None
 
 
 class UpdateConnectionRequest(BaseModel):
     listen_port: Optional[int] = None
     protocol_version: Optional[str] = None
+    enable_xray: Optional[bool] = None
     params: Optional[Dict[str, Any]] = None
 
 
@@ -556,9 +559,13 @@ async def next_connection_defaults(request: Request):
     while suggested_x in existing_x:
         suggested_x += 1
 
-    params_v1 = generate_awg_params("1.0")
-    params_v2 = generate_awg_params("2.0")
-    params_v3 = generate_awg_params("3.1")
+    params_v1 = generate_awg_params("1.0", preset="default")
+    params_v2 = generate_awg_params("2.0", preset="default")
+    params_v3 = generate_awg_params("3.1", preset="default")
+
+    params_v1_m = generate_awg_params("1.0", preset="mobile")
+    params_v2_m = generate_awg_params("2.0", preset="mobile")
+    params_v3_m = generate_awg_params("3.1", preset="mobile")
 
     return {
         "suggested_name": f"awg{next_idx}",
@@ -568,10 +575,21 @@ async def next_connection_defaults(request: Request):
         "suggested_fwmark": next_mrk,
         "suggested_listen_port": next_port,
         "suggested_xray_port": 7010,
+        "suggested_enable_xray": True,
         "params_preview": {
             "1.0": params_v1,
             "2.0": params_v2,
             "3.1": params_v3,
+            "default": {
+                "1.0": params_v1,
+                "2.0": params_v2,
+                "3.1": params_v3,
+            },
+            "mobile": {
+                "1.0": params_v1_m,
+                "2.0": params_v2_m,
+                "3.1": params_v3_m,
+            },
         },
     }
 
@@ -656,7 +674,7 @@ async def api_create_connection(req: CreateConnectionRequest, request: Request):
             from app.awg_crypto import generate_header_protection_key
             params["HeaderProtectionKey"] = generate_header_protection_key()
     else:
-        params = generate_awg_params(req.protocol_version)
+        params = generate_awg_params(req.protocol_version, preset=req.preset)
     params["protocol_version"] = req.protocol_version
 
     # Keys
@@ -676,6 +694,7 @@ async def api_create_connection(req: CreateConnectionRequest, request: Request):
             fwmark=fwmark,
             params=params,
             server_id=req.server_id,
+            enable_xray=req.enable_xray,
         )
     except sqlite3.IntegrityError as e:
         raise HTTPException(status_code=400, detail=f"Ошибка базы данных при создании подключения: {e}")
@@ -774,7 +793,13 @@ async def api_update_connection(conn_id: int, req: UpdateConnectionRequest, requ
 
     # Update in database
     try:
-        update_connection_params(conn_id, current_params, listen_port=listen_port, protocol_version=proto)
+        update_connection_params(
+            conn_id,
+            current_params,
+            listen_port=listen_port,
+            protocol_version=proto,
+            enable_xray=req.enable_xray,
+        )
     except sqlite3.IntegrityError as e:
         raise HTTPException(status_code=400, detail=f"Ошибка базы данных при обновлении параметров: {e}")
 

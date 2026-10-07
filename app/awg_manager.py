@@ -129,10 +129,20 @@ def generate_server_config_text(conn_id: int) -> str:
         lines.append("# --- Obfuscation Parameters ---")
         lines.extend(param_lines)
 
-    # Xray TProxy Rules
+    # Routing Rules: Xray TProxy or Direct NAT
+    enable_xray = bool(conn.get("enable_xray", 1))
     lines.append("")
-    xray_rules = format_wg_rules(name, x_subnet, xray_port, table_num, fwmark)
-    lines.append(xray_rules)
+    if enable_xray:
+        xray_rules = format_wg_rules(name, x_subnet, xray_port, table_num, fwmark)
+        lines.append(xray_rules)
+    else:
+        lines.append("# --- Прямая маршрутизация (без таблицы Xray TProxy) ---")
+        lines.append(f"PostUp = iptables -t nat -A POSTROUTING -s 10.{x_subnet}.0.0/16 -j MASQUERADE || true")
+        lines.append(f"PostUp = iptables -A FORWARD -i {name} -j ACCEPT || true")
+        lines.append(f"PostUp = iptables -A FORWARD -o {name} -j ACCEPT || true")
+        lines.append(f"PostDown = iptables -t nat -D POSTROUTING -s 10.{x_subnet}.0.0/16 -j MASQUERADE || true")
+        lines.append(f"PostDown = iptables -D FORWARD -i {name} -j ACCEPT || true")
+        lines.append(f"PostDown = iptables -D FORWARD -o {name} -j ACCEPT || true")
 
     # Peers
     peers = get_peers_by_connection(conn_id)

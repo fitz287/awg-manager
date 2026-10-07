@@ -610,46 +610,84 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <div>
-            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Подсеть (X в 10.x.0.0/16)</label>
-            <div class="relative flex items-center">
-              <span class="absolute left-3 text-slate-400 text-sm font-mono">10.</span>
-              <input type="number" id="conn-x-subnet" required min="1" max="254" value="13"
-                class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-24 py-2.5 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
-              <span class="absolute right-3 text-slate-400 text-sm font-mono">.0.0/16</span>
-            </div>
-            <p class="text-[11px] text-slate-500 mt-1">IP сервера: 10.<span id="preview-x">13</span>.0.1/16</p>
-          </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-2">Пресет обфускации</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+            <label class="cursor-pointer border border-slate-800 rounded-xl p-3 bg-slate-950/60 hover:border-indigo-500/50 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-600/10 transition flex items-center justify-between gap-2">
+              <input type="radio" name="conn_preset" value="default" class="sr-only" onchange="onPresetChange('default')" checked />
+              <div>
+                <span class="font-bold text-sm text-indigo-300 block">Стандартный</span>
+                <span class="text-[11px] text-slate-400">Случайные диапазоны AWG</span>
+              </div>
+              <span class="text-xs text-indigo-400 font-semibold px-2 py-0.5 rounded bg-indigo-500/10">Default</span>
+            </label>
 
-          <div>
-            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Порт передачи в XRAY</label>
-            <input type="number" id="conn-xray-port" required min="1" max="65535" value="7010"
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono" />
-            <p class="text-[11px] text-slate-500 mt-1">Входящий TProxy инбаунд в Xray</p>
+            <label class="cursor-pointer border border-slate-800 rounded-xl p-3 bg-slate-950/60 hover:border-amber-500/50 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-500/10 transition flex items-center justify-between gap-2">
+              <input type="radio" name="conn_preset" value="mobile" class="sr-only" onchange="onPresetChange('mobile')" />
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-sm text-amber-400">Мобильный (--mobile)</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">bivlked</span>
+                </div>
+                <span class="text-[11px] text-slate-400">Jc=3, J=30-130, DNS I1 CPS, порт 443</span>
+              </div>
+              <span class="text-xs text-amber-400 font-semibold px-2 py-0.5 rounded bg-amber-500/10">Mobile</span>
+            </label>
           </div>
         </div>
 
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Подсеть (X в 10.x.0.0/16)</label>
+          <div class="relative flex items-center">
+            <span class="absolute left-3 text-slate-400 text-sm font-mono">10.</span>
+            <input type="number" id="conn-x-subnet" required min="1" max="254" value="13"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-24 py-2.5 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
+            <span class="absolute right-3 text-slate-400 text-sm font-mono">.0.0/16</span>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1">IP сервера в VPN: 10.<span id="preview-x">13</span>.0.1/16</p>
+        </div>
+
         <div class="p-3.5 sm:p-4 rounded-xl bg-slate-950/70 border border-slate-800/90 space-y-3">
-          <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between flex-wrap gap-2">
             <span class="text-xs font-semibold uppercase tracking-wide text-slate-300 flex items-center gap-1.5">
               <i data-lucide="route" class="w-3.5 h-3.5 text-indigo-400"></i>
-              Маршрутизация (Авто-инкремент)
+              Маршрутизация
             </span>
-            <span class="text-[11px] text-emerald-400 font-medium">Без конфликтов</span>
+            <label class="inline-flex items-center gap-2 cursor-pointer bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800 hover:border-slate-700 transition">
+              <input type="checkbox" id="conn-enable-xray" checked onchange="onEnableXrayToggle()" class="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer" />
+              <span class="text-xs text-slate-300 font-medium select-none">Маршрутизация в XRAY (TProxy)</span>
+            </label>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div>
-              <label class="block text-[11px] text-slate-400 mb-1">Номер таблицы</label>
-              <input type="number" id="conn-table" required
-                class="w-full bg-dark-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
+          <!-- Xray Enabled Block -->
+          <div id="xray-routing-fields" class="space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Порт XRAY (TProxy)</label>
+                <input type="number" id="conn-xray-port" required min="1" max="65535" value="7010"
+                  class="w-full bg-dark-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Номер таблицы</label>
+                <input type="number" id="conn-table" required
+                  class="w-full bg-dark-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Метка fwmark</label>
+                <input type="number" id="conn-fwmark" required
+                  class="w-full bg-dark-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
+              </div>
             </div>
-            <div>
-              <label class="block text-[11px] text-slate-400 mb-1">Метка fwmark</label>
-              <input type="number" id="conn-fwmark" required
-                class="w-full bg-dark-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
+            <p class="text-[11px] text-slate-500">Автоматически создаётся отдельная ip rule и таблица маршрутизации в локальный инбаунд Xray TProxy.</p>
+          </div>
+
+          <!-- Direct NAT Block (shown when Xray is disabled) -->
+          <div id="direct-routing-info" class="hidden p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 space-y-1">
+            <div class="font-semibold flex items-center gap-1.5">
+              <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+              Прямой выход в интернет (Direct MASQUERADE)
             </div>
+            <p class="text-emerald-300/80">Таблица Xray не создаётся. Трафик клиентов AWG направляется напрямую в интернет через MASQUERADE без проксирования.</p>
           </div>
         </div>
 
@@ -863,6 +901,17 @@
             <input type="number" id="edit-conn-port" required min="1" max="65535"
               class="w-full bg-dark-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none" />
           </div>
+        </div>
+
+        <div class="flex items-center justify-between p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+          <div class="flex items-center gap-2">
+            <i data-lucide="route" class="w-4 h-4 text-amber-400"></i>
+            <div>
+              <span class="text-xs font-semibold text-white block">Маршрутизация в XRAY (TProxy)</span>
+              <span class="text-[11px] text-slate-400">При выключении трафик клиентов пойдет напрямую через MASQUERADE (без Xray)</span>
+            </div>
+          </div>
+          <input type="checkbox" id="edit-conn-enable-xray" class="rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500 w-4 h-4 cursor-pointer" />
         </div>
 
         <!-- Obfuscation Parameters Textarea -->
@@ -1404,6 +1453,7 @@
     let clientInfoData = null;
     let nextDefaults = null;
     let currentProtocol = '1.0';
+    let currentPreset = 'default';
     let qrcodeObj = null;
     let activeModalConfigText = '';
     let activeModalPeerId = null;
@@ -2188,8 +2238,15 @@
                   <span class="font-mono bg-slate-950 px-2 py-0.5 rounded text-indigo-300 border border-slate-800">10.${c.x_subnet}.0.0/16</span>
                 </div>
                 <div class="flex justify-between items-center text-slate-300">
-                  <span class="text-slate-400">XRAY TProxy:</span>
-                  <span class="font-medium text-amber-300">Порт ${c.xray_port} (Табл. ${c.table_num}, Mark ${c.fwmark})</span>
+                  <span class="text-slate-400">Маршрутизация:</span>
+                  ${(c.enable_xray === 0 || c.enable_xray === false)
+                    ? `<span class="inline-flex items-center gap-1 font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 text-[11px]" title="Прямой выход через MASQUERADE">
+                         <i data-lucide="shield" class="w-3 h-3"></i> Прямой NAT
+                       </span>`
+                    : `<span class="inline-flex items-center gap-1 font-medium text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 text-[11px]" title="Таблица ${c.table_num}, Mark ${c.fwmark}">
+                         <i data-lucide="route" class="w-3 h-3"></i> XRAY :${c.xray_port} (T:${c.table_num})
+                       </span>`
+                  }
                 </div>
                 <div class="flex justify-between items-center text-slate-300">
                   <span class="text-slate-400">Клиенты:</span>
@@ -2261,6 +2318,15 @@
           `).join('');
         }
 
+        currentPreset = 'default';
+        const rDefault = document.querySelector('input[name="conn_preset"][value="default"]');
+        if (rDefault) rDefault.checked = true;
+        const rProto1 = document.querySelector('input[name="protocol_version"][value="1.0"]');
+        if (rProto1) rProto1.checked = true;
+        const chkXray = document.getElementById('conn-enable-xray');
+        if (chkXray) chkXray.checked = true;
+        onEnableXrayToggle();
+
         setParamsInputMode('auto');
         onProtocolChange('1.0');
         openModal('modal-create-conn');
@@ -2294,13 +2360,66 @@
       }
     }
 
-    function onProtocolChange(version) {
-      currentProtocol = version;
+    function onPresetChange(preset) {
+      currentPreset = preset;
+      const portInput = document.getElementById('conn-port');
+
+      if (preset === 'mobile') {
+        if (portInput && (portInput.value === '51820' || (nextDefaults && portInput.value === String(nextDefaults.suggested_listen_port)))) {
+          portInput.value = '443';
+        }
+      } else {
+        if (portInput && portInput.value === '443') {
+          portInput.value = (nextDefaults && nextDefaults.suggested_listen_port) ? nextDefaults.suggested_listen_port : '51820';
+        }
+      }
+
+      updateParamsPreview();
+
+      if (paramsInputMode === 'manual') {
+        fillParamsTemplate();
+      }
+    }
+
+    function onEnableXrayToggle() {
+      const isXray = document.getElementById('conn-enable-xray') ? document.getElementById('conn-enable-xray').checked : true;
+      const fields = document.getElementById('xray-routing-fields');
+      const info = document.getElementById('direct-routing-info');
+      const xrayPort = document.getElementById('conn-xray-port');
+      const tbl = document.getElementById('conn-table');
+      const fwm = document.getElementById('conn-fwmark');
+
+      if (isXray) {
+        if (fields) fields.classList.remove('hidden');
+        if (info) info.classList.add('hidden');
+        if (xrayPort) xrayPort.required = true;
+        if (tbl) tbl.required = true;
+        if (fwm) fwm.required = true;
+      } else {
+        if (fields) fields.classList.add('hidden');
+        if (info) info.classList.remove('hidden');
+        if (xrayPort) xrayPort.required = false;
+        if (tbl) tbl.required = false;
+        if (fwm) fwm.required = false;
+      }
+    }
+
+    function updateParamsPreview() {
       const lbl = document.getElementById('auto-proto-label');
-      if (lbl) lbl.innerText = `AWG ${version}`;
+      if (lbl) {
+        lbl.innerText = `AWG ${currentProtocol}` + (currentPreset === 'mobile' ? ' (Мобильный / bivlked)' : '');
+      }
 
       if (nextDefaults && nextDefaults.params_preview) {
-        const p = nextDefaults.params_preview[version];
+        let p = null;
+        if (currentPreset === 'mobile' && nextDefaults.params_preview.mobile) {
+          p = nextDefaults.params_preview.mobile[currentProtocol];
+        } else if (nextDefaults.params_preview.default) {
+          p = nextDefaults.params_preview.default[currentProtocol];
+        } else {
+          p = nextDefaults.params_preview[currentProtocol];
+        }
+
         if (p) {
           let html = '';
           for (const [k, v] of Object.entries(p)) {
@@ -2309,6 +2428,11 @@
           document.getElementById('params-preview-box').innerHTML = html;
         }
       }
+    }
+
+    function onProtocolChange(version) {
+      currentProtocol = version;
+      updateParamsPreview();
 
       if (paramsInputMode === 'manual') {
         fillParamsTemplate();
@@ -2340,31 +2464,66 @@
 
     function fillParamsTemplate() {
       const textarea = document.getElementById('conn-manual-params');
-      const h = generateRandomHeaders();
-      const jc = randomInt(4, 7);
-      const jmin = randomInt(30, 60);
-      const jmax = randomInt(850, 1050);
-      const s1 = randomInt(40, 120);
-      const s2 = randomInt(35, 90);
+      const isMobile = (currentPreset === 'mobile');
 
-      if (currentProtocol === '1.0') {
-        textarea.value = `Jc = ${jc}\nJmin = ${jmin}\nJmax = ${jmax}\nS1 = ${s1}\nS2 = ${s2}\nH1 = ${h[0]}\nH2 = ${h[1]}\nH3 = ${h[2]}\nH4 = ${h[3]}`;
-      } else if (currentProtocol === '2.0') {
-        const h1_start = randomInt(1500000000, 1750000000);
-        const h1_end = h1_start + randomInt(50000000, 120000000);
-        const h2_start = randomInt(1850000000, 2050000000);
-        const h2_end = h2_start + randomInt(30000000, 80000000);
-        const h3_start = randomInt(2080000000, 2120000000);
-        const h3_end = h3_start + randomInt(10000000, 30000000);
-        const h4_start = randomInt(2130000000, 2145000000);
-        const h4_end = h4_start + randomInt(1000000, 2000000);
+      if (isMobile) {
+        const jc = 3;
+        const jmin = randomInt(30, 50);
+        const jmax = jmin + randomInt(20, 80);
+        let s1 = randomInt(15, 150);
+        let s2 = randomInt(15, 150);
+        while (s1 + 56 === s2) s2 = randomInt(15, 150);
+        let s3 = randomInt(12, 55);
+        while (s2 + 28 === s3) s3 = randomInt(12, 55);
+        let s4 = randomInt(12, 27);
+        const dnsI1 = '<r 2><b 0x858000010001000000000669636c6f756403636f6d0000010001c00c000100010000105a00044d583737>';
 
-        textarea.value = `Jc = ${jc}\nJmin = ${jmin}\nJmax = ${jmax}\nS1 = ${s1}\nS2 = ${s2}\nS3 = ${randomInt(15, 40)}\nS4 = ${randomInt(12, 30)}\nH1 = ${h1_start}-${h1_end}\nH2 = ${h2_start}-${h2_end}\nH3 = ${h3_start}-${h3_end}\nH4 = ${h4_start}-${h4_end}\nI1 = <r 2><b 0x858000010001000000000669636c6f756403636f6d0000010001c00c000100010000105a00044d583737>`;
+        if (currentProtocol === '1.0') {
+          const h = generateRandomHeaders();
+          textarea.value = `Jc = ${jc}\nJmin = ${jmin}\nJmax = ${jmax}\nS1 = ${s1}\nS2 = ${s2}\nH1 = ${h[0]}\nH2 = ${h[1]}\nH3 = ${h[2]}\nH4 = ${h[3]}`;
+        } else if (currentProtocol === '2.0') {
+          const h1_s = randomInt(1500000000, 1750000000);
+          const h1_e = h1_s + randomInt(50000000, 120000000);
+          const h2_s = randomInt(1850000000, 2050000000);
+          const h2_e = h2_s + randomInt(30000000, 80000000);
+          const h3_s = randomInt(2080000000, 2120000000);
+          const h3_e = h3_s + randomInt(10000000, 30000000);
+          const h4_s = randomInt(2130000000, 2145000000);
+          const h4_e = h4_s + randomInt(1000000, 2000000);
+          textarea.value = `Jc = ${jc}\nJmin = ${jmin}\nJmax = ${jmax}\nS1 = ${s1}\nS2 = ${s2}\nS3 = ${s3}\nS4 = ${s4}\nH1 = ${h1_s}-${h1_e}\nH2 = ${h2_s}-${h2_e}\nH3 = ${h3_s}-${h3_e}\nH4 = ${h4_s}-${h4_e}\nI1 = ${dnsI1}`;
+        } else {
+          const hpk = randomBase64(32);
+          const padMin = randomInt(32, 48);
+          const padMax = randomInt(70, 128);
+          textarea.value = `Jc = ${jc}\nJmin = ${jmin}\nJmax = ${jmax}\nS1 = ${s1}\nS2 = ${s2}\nS3 = ${s3}\nS4 = ${s4}\nH1 = 1\nH2 = 2\nH3 = 3\nH4 = 4\nHeaderProtectionKey = ${hpk}\nContentPaddingAddition = ${padMin}-${padMax}\nRandomTrailers = on\nRekeyAfterTime = 100-120\nRekeyTimeout = 3-7\nRejectAfterTime = 150-180\nKeepaliveTimeout = 5-15\nMaxHandshakeAttempts = 15-20\nI1 = ${dnsI1}`;
+        }
       } else {
-        const hpk = randomBase64(32);
-        const padMin = randomInt(10, 25);
-        const padMax = randomInt(60, 110);
-        textarea.value = `Jc = ${jc}\nJmin = ${jmin}\nJmax = ${jmax}\nS1 = ${s1}\nS2 = ${s2}\nS3 = ${randomInt(20, 50)}\nS4 = ${randomInt(12, 28)}\nH1 = ${h[0]}\nH2 = ${h[1]}\nH3 = ${h[2]}\nH4 = ${h[3]}\nHeaderProtectionKey = ${hpk}\nContentPaddingAddition = ${padMin}-${padMax}\nRandomTrailers = on\nRekeyAfterTime = 100-120\nRekeyTimeout = 3-7\nRejectAfterTime = 150-180\nKeepaliveTimeout = 5-15\nMaxHandshakeAttempts = 15-20`;
+        const h = generateRandomHeaders();
+        const jc = randomInt(4, 7);
+        const jmin = randomInt(30, 60);
+        const jmax = randomInt(850, 1050);
+        const s1 = randomInt(40, 120);
+        const s2 = randomInt(35, 90);
+
+        if (currentProtocol === '1.0') {
+          textarea.value = `Jc = ${jc}\nJmin = ${jmin}\nJmax = ${jmax}\nS1 = ${s1}\nS2 = ${s2}\nH1 = ${h[0]}\nH2 = ${h[1]}\nH3 = ${h[2]}\nH4 = ${h[3]}`;
+        } else if (currentProtocol === '2.0') {
+          const h1_start = randomInt(1500000000, 1750000000);
+          const h1_end = h1_start + randomInt(50000000, 120000000);
+          const h2_start = randomInt(1850000000, 2050000000);
+          const h2_end = h2_start + randomInt(30000000, 80000000);
+          const h3_start = randomInt(2080000000, 2120000000);
+          const h3_end = h3_start + randomInt(10000000, 30000000);
+          const h4_start = randomInt(2130000000, 2145000000);
+          const h4_end = h4_start + randomInt(1000000, 2000000);
+
+          textarea.value = `Jc = ${jc}\nJmin = ${jmin}\nJmax = ${jmax}\nS1 = ${s1}\nS2 = ${s2}\nS3 = ${randomInt(15, 40)}\nS4 = ${randomInt(12, 30)}\nH1 = ${h1_start}-${h1_end}\nH2 = ${h2_start}-${h2_end}\nH3 = ${h3_start}-${h3_end}\nH4 = ${h4_start}-${h4_end}\nI1 = <r 2><b 0x858000010001000000000669636c6f756403636f6d0000010001c00c000100010000105a00044d583737>`;
+        } else {
+          const hpk = randomBase64(32);
+          const padMin = randomInt(10, 25);
+          const padMax = randomInt(60, 110);
+          textarea.value = `Jc = ${jc}\nJmin = ${jmin}\nJmax = ${jmax}\nS1 = ${s1}\nS2 = ${s2}\nS3 = ${randomInt(20, 50)}\nS4 = ${randomInt(12, 28)}\nH1 = ${h[0]}\nH2 = ${h[1]}\nH3 = ${h[2]}\nH4 = ${h[3]}\nHeaderProtectionKey = ${hpk}\nContentPaddingAddition = ${padMin}-${padMax}\nRandomTrailers = on\nRekeyAfterTime = 100-120\nRekeyTimeout = 3-7\nRejectAfterTime = 150-180\nKeepaliveTimeout = 5-15\nMaxHandshakeAttempts = 15-20`;
+        }
       }
       onManualParamsInput();
     }
@@ -2455,7 +2614,7 @@
         const data = await res.json();
         if (data && data.params_preview) {
           nextDefaults.params_preview = data.params_preview;
-          onProtocolChange(currentProtocol);
+          updateParamsPreview();
           showToast('Сгенерированы новые параметры обфускации', 'info');
         }
       } catch (err) {
@@ -2476,20 +2635,33 @@
         }
         chosenParams = parsed.params;
       } else {
-        chosenParams = (nextDefaults && nextDefaults.params_preview && nextDefaults.params_preview[currentProtocol])
-          ? nextDefaults.params_preview[currentProtocol]
-          : undefined;
+        if (nextDefaults && nextDefaults.params_preview) {
+          if (currentPreset === 'mobile' && nextDefaults.params_preview.mobile) {
+            chosenParams = nextDefaults.params_preview.mobile[currentProtocol];
+          } else if (nextDefaults.params_preview.default) {
+            chosenParams = nextDefaults.params_preview.default[currentProtocol];
+          } else {
+            chosenParams = nextDefaults.params_preview[currentProtocol];
+          }
+        }
       }
+
+      const enableXray = document.getElementById('conn-enable-xray') ? document.getElementById('conn-enable-xray').checked : true;
+      const xrayPortVal = parseInt(document.getElementById('conn-xray-port').value);
+      const tblVal = parseInt(document.getElementById('conn-table').value);
+      const fwmVal = parseInt(document.getElementById('conn-fwmark').value);
 
       const payload = {
         server_id: parseInt(document.getElementById('conn-server-id').value) || 1,
         name: document.getElementById('conn-name').value.trim(),
         protocol_version: currentProtocol,
+        preset: currentPreset,
         x_subnet: parseInt(document.getElementById('conn-x-subnet').value),
         listen_port: parseInt(document.getElementById('conn-port').value),
-        xray_port: parseInt(document.getElementById('conn-xray-port').value),
-        table_num: parseInt(document.getElementById('conn-table').value),
-        fwmark: parseInt(document.getElementById('conn-fwmark').value),
+        enable_xray: enableXray,
+        xray_port: !isNaN(xrayPortVal) ? xrayPortVal : 7010,
+        table_num: !isNaN(tblVal) ? tblVal : undefined,
+        fwmark: !isNaN(fwmVal) ? fwmVal : undefined,
         params: chosenParams,
       };
 
@@ -2677,9 +2849,19 @@
       }
       activeEditConnId = connId;
 
-      document.getElementById('edit-conn-title').innerText = `Настройка ${c.name}`;
+      const titleBadge = document.getElementById('edit-conn-name-badge');
+      if (titleBadge) titleBadge.innerText = c.name;
+      const titleEl = document.getElementById('edit-conn-title');
+      if (titleEl) titleEl.innerText = `Настройка ${c.name}`;
+
       document.getElementById('edit-conn-port').value = c.listen_port || 51820;
-      document.getElementById('edit-conn-proto').value = c.protocol_version || '1.0';
+      const protoEl = document.getElementById('edit-conn-protocol') || document.getElementById('edit-conn-proto');
+      if (protoEl) protoEl.value = c.protocol_version || '1.0';
+
+      const xrayChk = document.getElementById('edit-conn-enable-xray');
+      if (xrayChk) {
+        xrayChk.checked = (c.enable_xray !== 0 && c.enable_xray !== false);
+      }
 
       const paramsText = formatParamsAsLines(c.params || {});
       document.getElementById('edit-conn-params').value = paramsText;
@@ -2705,7 +2887,8 @@
     }
 
     async function regenerateEditParams() {
-      const proto = document.getElementById('edit-conn-proto').value;
+      const protoEl = document.getElementById('edit-conn-protocol') || document.getElementById('edit-conn-proto');
+      const proto = protoEl ? protoEl.value : '1.0';
       try {
         const res = await fetch('/api/connections/next-defaults');
         const data = await res.json();
@@ -2726,7 +2909,10 @@
 
       const connId = activeEditConnId;
       const port = parseInt(document.getElementById('edit-conn-port').value);
-      const proto = document.getElementById('edit-conn-proto').value;
+      const protoEl = document.getElementById('edit-conn-protocol') || document.getElementById('edit-conn-proto');
+      const proto = protoEl ? protoEl.value : '1.0';
+      const xrayChk = document.getElementById('edit-conn-enable-xray');
+      const enableXray = xrayChk ? xrayChk.checked : undefined;
       const rawText = document.getElementById('edit-conn-params').value;
       const { params, count } = parseManualParamsText(rawText);
 
@@ -2750,6 +2936,7 @@
           body: JSON.stringify({
             listen_port: port,
             protocol_version: proto,
+            enable_xray: enableXray,
             params: params,
           }),
         });
