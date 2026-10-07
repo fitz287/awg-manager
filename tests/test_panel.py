@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.database import (
     init_db,
+    create_server,
     create_connection,
     get_all_connections,
     get_next_connection_index,
@@ -29,17 +30,41 @@ from app.awg_manager import (
     get_interface_conf_file,
     get_interface_symlink,
 )
+import shutil
+import tempfile
+import app.config
+import app.database
+import app.awg_manager
+
+_TEST_DB = tempfile.mktemp(prefix="test_awg_", suffix=".db")
+_TEST_CONF_DIR = Path(tempfile.mkdtemp(prefix="test_awg_confs_"))
+
+app.config.DB_PATH = _TEST_DB
+app.database.DB_PATH = _TEST_DB
+app.config.CONFIG_BASE_DIR = _TEST_CONF_DIR
+app.awg_manager.CONFIG_BASE_DIR = _TEST_CONF_DIR
 
 
 class TestAWGPanel(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         init_db()
-        from app.database import get_db
-        with get_db() as conn:
-            conn.execute("DELETE FROM peer_configs")
-            conn.execute("DELETE FROM users")
-            conn.execute("DELETE FROM connections")
+        create_server(name="Local Server", host="127.0.0.1", status="online")
+
+    @classmethod
+    def tearDownClass(cls):
+        if os.path.exists(_TEST_DB):
+            try:
+                os.remove(_TEST_DB)
+            except Exception:
+                pass
+        if _TEST_CONF_DIR.exists():
+            try:
+                shutil.rmtree(_TEST_CONF_DIR)
+            except Exception:
+                pass
+
+
 
     def test_01_connection_and_table_increment(self):
         print("\n--- Testing Connection Creation & Table Increment ---")

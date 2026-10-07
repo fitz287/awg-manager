@@ -350,7 +350,7 @@ def get_all_connections() -> List[Dict[str, Any]]:
             d = dict(r)
             d["params"] = json.loads(d["params_json"])
             # Peer and user count
-            uc = conn.execute("SELECT COUNT(*) FROM users WHERE connection_id = ?", (d["id"],)).fetchone()[0]
+            uc = conn.execute("SELECT COUNT(DISTINCT user_id) FROM peer_configs WHERE connection_id = ?", (d["id"],)).fetchone()[0]
             pc = conn.execute("SELECT COUNT(*) FROM peer_configs WHERE connection_id = ?", (d["id"],)).fetchone()[0]
             d["user_count"] = uc
             d["peer_count"] = pc
